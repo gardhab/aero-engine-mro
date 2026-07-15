@@ -4,6 +4,9 @@
   "files": [],
   "references": [
     {
+      "path": "./lib/mro-core"
+    },
+    {
       "path": "./lib/db"
     },
     {

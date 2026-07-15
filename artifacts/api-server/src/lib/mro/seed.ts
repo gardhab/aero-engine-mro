@@ -1,0 +1,130 @@
+import { randomUUID } from "node:crypto";
+import { sql } from "drizzle-orm";
+import {
+  db,
+  enginesTable,
+  readingsTable,
+  rulesTable,
+  ontologyVersionsTable,
+} from "@workspace/db";
+import {
+  FLEET,
+  SEED_CLASSES,
+  SEED_RELATIONSHIPS,
+  SEED_RULES,
+  buildEngine,
+  computeEngineHealth,
+  egtMarginOf,
+  generateReadings,
+  serializeToTurtle,
+  type OntologyClass,
+} from "@workspace/mro-core";
+import { runPipeline, rebuildGraphReplace, rebuildGraphMerge } from "./service";
+import { logger } from "../logger";
+
+const SEED_CLASSES_FULL: OntologyClass[] = SEED_CLASSES.map((c) => ({
+  ...c,
+  instanceCount: 0,
+  ruleCount: 0,
+}));
+
+let seedPromise: Promise<void> | null = null;
+
+/** Idempotently seed the datastore on first boot. Safe to call concurrently. */
+export async function ensureSeeded(): Promise<void> {
+  if (!seedPromise) seedPromise = doSeed();
+  return seedPromise;
+}
+
+async function doSeed(): Promise<void> {
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(enginesTable);
+  if (count > 0) {
+    logger.info({ engines: count }, "Datastore already seeded");
+    // Merge (not replace) so any manual graph-node corrections survive restarts.
+    await rebuildGraphMerge();
+    return;
+  }
+
+  logger.info("Seeding MRO datastore (engines, readings, rules, ontology)");
+  const now = new Date();
+
+  // Ontology: one published baseline version plus an editable draft copy.
+  const publishedTurtle = serializeToTurtle({
+    version: "1.0.0",
+    status: "published",
+    classes: SEED_CLASSES_FULL,
+    relationships: SEED_RELATIONSHIPS,
+    updatedAt: now.toISOString(),
+  });
+
+  // Insert the core bootstrap (rules + engines + readings + ontology) atomically
+  // so a mid-seed failure never leaves an inconsistent datastore that the
+  // engine-count readiness check would wrongly treat as fully seeded.
+  await db.transaction(async (tx) => {
+    await tx.insert(rulesTable).values(SEED_RULES);
+
+    for (const spec of FLEET) {
+      const engine = buildEngine(spec, now);
+      const readings = generateReadings(spec, now);
+      const health = computeEngineHealth(engine, readings, SEED_RULES);
+      await tx.insert(enginesTable).values({
+        esn: engine.esn,
+        model: engine.model,
+        tailNumber: engine.tailNumber,
+        operator: engine.operator ?? null,
+        status: health.status,
+        healthScore: health.healthScore,
+        tsn: engine.tsn,
+        csn: engine.csn,
+        tso: engine.tso,
+        cso: engine.cso,
+        egtMargin: egtMarginOf(readings),
+        lastUpdated: now,
+      });
+      for (let i = 0; i < readings.length; i += 500) {
+        const chunk = readings.slice(i, i + 500).map((r) => ({
+          engineId: r.engineId,
+          parameter: r.parameter,
+          label: r.label,
+          value: r.value,
+          unit: r.unit,
+          cycle: r.cycle,
+          timestamp: new Date(r.timestamp),
+          status: r.status,
+        }));
+        await tx.insert(readingsTable).values(chunk);
+      }
+    }
+
+    await tx.insert(ontologyVersionsTable).values([
+      {
+        version: "1.0.0",
+        status: "published",
+        note: "Baseline ontology",
+        author: "System",
+        classes: SEED_CLASSES_FULL,
+        relationships: SEED_RELATIONSHIPS,
+        turtle: publishedTurtle,
+        createdAt: now,
+      },
+      {
+        version: "draft",
+        status: "draft",
+        note: "Working draft",
+        author: "System",
+        classes: SEED_CLASSES_FULL,
+        relationships: SEED_RELATIONSHIPS,
+        turtle: publishedTurtle,
+        createdAt: now,
+      },
+    ]);
+  });
+
+  // Run the decision pipeline to generate the initial recommendations, then
+  // build the knowledge graph from the resulting domain state.
+  await runPipeline(now);
+  await rebuildGraphReplace();
+  logger.info("Seeding complete");
+}

@@ -3,13 +3,34 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: >-
+    Aircraft Engine MRO Decision Support API. Ingests engine condition data,
+    reasons over it with a domain ontology, knowledge graph and rules engine,
+    and produces traceable MRO Work Recommendations for human planners and for
+    SAP S/4HANA Cloud (mock mode).
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: dashboard
+    description: Fleet overview and activity
+  - name: engines
+    description: Monitored engines and sensor readings
+  - name: recommendations
+    description: MRO Work Recommendations and review workflow
+  - name: rules
+    description: Data-driven ECTM rules
+  - name: ontology
+    description: SME-editable domain ontology
+  - name: graph
+    description: Knowledge graph explorer
+  - name: sap
+    description: SAP S/4HANA Cloud adapter (mock mode)
+  - name: backtest
+    description: Historical replay and evaluation
+
 paths:
   /healthz:
     get:
@@ -24,7 +45,634 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Fleet health summary
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/activity:
+    get:
+      operationId: getActivity
+      tags: [dashboard]
+      summary: Recent activity feed
+      responses:
+        "200":
+          description: Activity events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityEvent"
+
+  /engines:
+    get:
+      operationId: listEngines
+      tags: [engines]
+      summary: List monitored engines
+      responses:
+        "200":
+          description: Engines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Engine"
+
+  /engines/{esn}:
+    get:
+      operationId: getEngine
+      tags: [engines]
+      summary: Get one engine
+      parameters:
+        - $ref: "#/components/parameters/EsnParam"
+      responses:
+        "200":
+          description: Engine
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Engine"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /engines/{esn}/health:
+    get:
+      operationId: getEngineHealth
+      tags: [engines]
+      summary: Get engine parameter health
+      parameters:
+        - $ref: "#/components/parameters/EsnParam"
+      responses:
+        "200":
+          description: Engine health
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EngineHealth"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /readings:
+    get:
+      operationId: getEngineReadings
+      tags: [engines]
+      summary: Get engine sensor readings (time series)
+      parameters:
+        - name: engineId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Engine serial number (ESN)
+        - name: parameter
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by ECTM parameter code (e.g. EGT_MARGIN)
+      responses:
+        "200":
+          description: Readings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ParameterReading"
+
+  /recommendations:
+    get:
+      operationId: listRecommendations
+      tags: [recommendations]
+      summary: List MRO Work Recommendations
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/RecommendationStatus"
+        - name: engineId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Recommendations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Recommendation"
+
+  /recommendations/{id}:
+    get:
+      operationId: getRecommendation
+      tags: [recommendations]
+      summary: Get one recommendation with full traceability
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Recommendation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recommendation"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateRecommendation
+      tags: [recommendations]
+      summary: Edit a recommendation
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendationUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recommendation"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /recommendations/{id}/approve:
+    post:
+      operationId: approveRecommendation
+      tags: [recommendations]
+      summary: Approve a recommendation
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewInput"
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recommendation"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /recommendations/{id}/reject:
+    post:
+      operationId: rejectRecommendation
+      tags: [recommendations]
+      summary: Reject a recommendation
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewInput"
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recommendation"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /recommendations/{id}/push-to-sap:
+    post:
+      operationId: pushRecommendationToSap
+      tags: [recommendations, sap]
+      summary: Push an approved recommendation to SAP as a Maintenance Notification
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: SAP notification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SapNotification"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /pipeline/run:
+    post:
+      operationId: runPipeline
+      tags: [recommendations]
+      summary: Run the decision pipeline over current engine data
+      responses:
+        "200":
+          description: Pipeline result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PipelineResult"
+
+  /rules:
+    get:
+      operationId: listRules
+      tags: [rules]
+      summary: List ECTM rules
+      responses:
+        "200":
+          description: Rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Rule"
+
+  /rules/{id}:
+    get:
+      operationId: getRule
+      tags: [rules]
+      summary: Get one rule
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rule"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateRule
+      tags: [rules]
+      summary: Edit a rule (thresholds, cycles, enable/disable)
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rule"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /ontology:
+    get:
+      operationId: getOntology
+      tags: [ontology]
+      summary: Get the published ontology
+      responses:
+        "200":
+          description: Ontology
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ontology"
+
+  /ontology/draft:
+    get:
+      operationId: getOntologyDraft
+      tags: [ontology]
+      summary: Get the working draft ontology
+      responses:
+        "200":
+          description: Draft ontology
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ontology"
+
+  /ontology/turtle:
+    get:
+      operationId: getOntologyTurtle
+      tags: [ontology]
+      summary: Get the canonical Turtle serialization
+      responses:
+        "200":
+          description: Turtle text
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OntologyTurtle"
+
+  /ontology/versions:
+    get:
+      operationId: listOntologyVersions
+      tags: [ontology]
+      summary: List ontology versions
+      responses:
+        "200":
+          description: Versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OntologyVersion"
+
+  /ontology/classes:
+    post:
+      operationId: createOntologyClass
+      tags: [ontology]
+      summary: Add a class to the draft ontology
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OntologyClassInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OntologyClass"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /ontology/classes/{id}:
+    patch:
+      operationId: updateOntologyClass
+      tags: [ontology]
+      summary: Edit or deprecate a class in the draft ontology
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OntologyClassUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OntologyClass"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /ontology/relationships:
+    post:
+      operationId: createOntologyRelationship
+      tags: [ontology]
+      summary: Add a relationship to the draft ontology
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OntologyRelationshipInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OntologyRelationship"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /ontology/validate:
+    post:
+      operationId: validateOntology
+      tags: [ontology]
+      summary: Validate the draft ontology (conformance + impact analysis)
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OntologyValidationResult"
+
+  /ontology/publish:
+    post:
+      operationId: publishOntology
+      tags: [ontology]
+      summary: Validate and publish the draft ontology as a new version
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OntologyPublishInput"
+      responses:
+        "200":
+          description: Published version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OntologyVersion"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /graph:
+    get:
+      operationId: getGraph
+      tags: [graph]
+      summary: Get knowledge-graph nodes and edges
+      parameters:
+        - name: engineId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Scope the graph to one engine's subgraph
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter nodes by class/type
+      responses:
+        "200":
+          description: Graph
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphData"
+
+  /graph/nodes/{id}:
+    get:
+      operationId: getGraphNode
+      tags: [graph]
+      summary: Get one graph node
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Node
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphNode"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateGraphNode
+      tags: [graph]
+      summary: Correct an instance node (validated against the ontology)
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GraphNodeUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphNode"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /sap/status:
+    get:
+      operationId: getSapStatus
+      tags: [sap]
+      summary: Get SAP adapter status (mock/live, configuration presence)
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SapStatus"
+
+  /sap/notifications:
+    get:
+      operationId: listSapNotifications
+      tags: [sap]
+      summary: List SAP notification attempts (success + manual-review queue)
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SapNotification"
+
+  /backtest/runs:
+    get:
+      operationId: listBacktestRuns
+      tags: [backtest]
+      summary: List backtest runs
+      responses:
+        "200":
+          description: Runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BacktestRun"
+
+  /backtest/runs/{id}:
+    get:
+      operationId: getBacktestRun
+      tags: [backtest]
+      summary: Get a backtest run with per-cycle detail
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BacktestRun"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /backtest/run:
+    post:
+      operationId: runBacktest
+      tags: [backtest]
+      summary: Replay historical data through the pipeline and evaluate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BacktestInput"
+      responses:
+        "200":
+          description: Completed run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BacktestRun"
+
 components:
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    EsnParam:
+      name: esn
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +682,614 @@ components:
       required:
         - status
 
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    EngineStatus:
+      type: string
+      enum: [operational, monitor, action_required, grounded]
+
+    RecommendationStatus:
+      type: string
+      enum: [pending, approved, rejected, pushed, failed]
+
+    Priority:
+      type: string
+      enum: [routine, expedite, urgent, aog]
+
+    Engine:
+      type: object
+      required:
+        - esn
+        - model
+        - tailNumber
+        - status
+        - healthScore
+        - tsn
+        - csn
+        - tso
+        - cso
+        - openRecommendations
+        - lastUpdated
+      properties:
+        esn: { type: string }
+        model: { type: string }
+        tailNumber: { type: string }
+        operator: { type: ["string", "null"] }
+        status: { $ref: "#/components/schemas/EngineStatus" }
+        healthScore: { type: integer }
+        tsn: { type: number, description: "Time since new (hours)" }
+        csn: { type: integer, description: "Cycles since new" }
+        tso: { type: number, description: "Time since overhaul (hours)" }
+        cso: { type: integer, description: "Cycles since overhaul" }
+        egtMargin: { type: ["number", "null"], description: "Current EGT margin (degC)" }
+        openRecommendations: { type: integer }
+        lastUpdated: { type: string }
+
+    ParameterReading:
+      type: object
+      required: [engineId, parameter, value, unit, cycle, timestamp, status]
+      properties:
+        engineId: { type: string }
+        parameter: { type: string }
+        label: { type: string }
+        value: { type: number }
+        unit: { type: string }
+        cycle: { type: integer }
+        timestamp: { type: string }
+        status:
+          type: string
+          enum: [normal, caution, warning]
+
+    ParameterHealth:
+      type: object
+      required: [parameter, label, value, unit, status]
+      properties:
+        parameter: { type: string }
+        label: { type: string }
+        value: { type: number }
+        unit: { type: string }
+        baseline: { type: ["number", "null"] }
+        limit: { type: ["number", "null"] }
+        trend:
+          type: string
+          enum: [stable, rising, falling]
+        status:
+          type: string
+          enum: [normal, caution, warning]
+
+    EngineHealth:
+      type: object
+      required: [esn, model, healthScore, status, parameters, moduleHealth]
+      properties:
+        esn: { type: string }
+        model: { type: string }
+        healthScore: { type: integer }
+        status: { $ref: "#/components/schemas/EngineStatus" }
+        parameters:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParameterHealth"
+        moduleHealth:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleHealth"
+
+    ModuleHealth:
+      type: object
+      required: [module, status]
+      properties:
+        module: { type: string }
+        status:
+          type: string
+          enum: [normal, caution, warning]
+        note: { type: ["string", "null"] }
+
+    Evidence:
+      type: object
+      required: [parameter, label, value, unit, cycle, timestamp, description]
+      properties:
+        parameter: { type: string }
+        label: { type: string }
+        value: { type: number }
+        unit: { type: string }
+        cycle: { type: integer }
+        timestamp: { type: string }
+        threshold: { type: ["number", "null"] }
+        description: { type: string }
+
+    MaintenanceTask:
+      type: object
+      required: [ataCode, description, skill, estimatedHours]
+      properties:
+        ataCode: { type: string, description: "ATA chapter / task code" }
+        s1000dCode: { type: ["string", "null"], description: "S1000D / iSpec 2200 task code" }
+        description: { type: string }
+        skill: { type: string }
+        estimatedHours: { type: number }
+
+    LifeLimitedPart:
+      type: object
+      required: [partNumber, description]
+      properties:
+        partNumber: { type: string }
+        description: { type: string }
+        cyclesRemaining: { type: ["integer", "null"] }
+
+    Recommendation:
+      type: object
+      required:
+        - id
+        - engineId
+        - engineModel
+        - tailNumber
+        - component
+        - failureMode
+        - faultDescription
+        - priority
+        - severity
+        - confidence
+        - status
+        - tasks
+        - requiredSkills
+        - estimatedDurationHours
+        - turnaroundDays
+        - workscopeLevel
+        - affectedModules
+        - evidence
+        - regulatoryRefs
+        - ruleId
+        - ruleName
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string }
+        engineId: { type: string }
+        engineModel: { type: string }
+        tailNumber: { type: string }
+        component: { type: string }
+        failureMode: { type: string }
+        faultDescription: { type: string }
+        priority: { $ref: "#/components/schemas/Priority" }
+        severity: { type: number, description: "0-1 severity score" }
+        confidence: { type: number, description: "0-1 confidence score" }
+        status: { $ref: "#/components/schemas/RecommendationStatus" }
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaintenanceTask"
+        requiredSkills:
+          type: array
+          items: { type: string }
+        estimatedDurationHours: { type: number }
+        turnaroundDays: { type: integer }
+        workscopeLevel: { type: string }
+        affectedModules:
+          type: array
+          items: { type: string }
+        lifeLimitedParts:
+          type: array
+          items:
+            $ref: "#/components/schemas/LifeLimitedPart"
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Evidence"
+        regulatoryRefs:
+          type: array
+          items: { type: string }
+        ruleId: { type: string }
+        ruleName: { type: string }
+        recommendedInductionDate: { type: ["string", "null"] }
+        recommendedCompletionDate: { type: ["string", "null"] }
+        sapNotificationNumber: { type: ["string", "null"] }
+        reviewedBy: { type: ["string", "null"] }
+        reviewNotes: { type: ["string", "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+
+    RecommendationUpdate:
+      type: object
+      properties:
+        priority: { $ref: "#/components/schemas/Priority" }
+        reviewNotes: { type: string }
+        estimatedDurationHours: { type: number }
+        turnaroundDays: { type: integer }
+        recommendedInductionDate: { type: string }
+        recommendedCompletionDate: { type: string }
+
+    ReviewInput:
+      type: object
+      properties:
+        notes: { type: string }
+        reviewedBy: { type: string }
+
+    PipelineResult:
+      type: object
+      required: [enginesEvaluated, rulesFired, recommendationsCreated]
+      properties:
+        enginesEvaluated: { type: integer }
+        rulesFired: { type: integer }
+        recommendationsCreated: { type: integer }
+        newRecommendationIds:
+          type: array
+          items: { type: string }
+
+    Rule:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - failureMode
+        - parameter
+        - operator
+        - threshold
+        - consecutiveCycles
+        - severity
+        - enabled
+        - autoApprove
+        - component
+        - regulatoryRefs
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        failureMode: { type: string }
+        parameter: { type: string }
+        operator:
+          type: string
+          enum: [lt, gt, trend_down, trend_up]
+        threshold: { type: number }
+        consecutiveCycles: { type: integer }
+        severity: { type: number }
+        enabled: { type: boolean }
+        autoApprove: { type: boolean }
+        component: { type: string }
+        recommendedTaskCode: { type: ["string", "null"] }
+        regulatoryRefs:
+          type: array
+          items: { type: string }
+
+    RuleUpdate:
+      type: object
+      properties:
+        threshold: { type: number }
+        consecutiveCycles: { type: integer }
+        severity: { type: number }
+        enabled: { type: boolean }
+        autoApprove: { type: boolean }
+
+    OntologyAttribute:
+      type: object
+      required: [name, type]
+      properties:
+        name: { type: string }
+        type: { type: string }
+        description: { type: ["string", "null"] }
+
+    OntologyClass:
+      type: object
+      required: [id, label, description, deprecated, attributes, instanceCount, ruleCount]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        description: { type: string }
+        parentClass: { type: ["string", "null"] }
+        deprecated: { type: boolean }
+        attributes:
+          type: array
+          items:
+            $ref: "#/components/schemas/OntologyAttribute"
+        instanceCount: { type: integer }
+        ruleCount: { type: integer }
+
+    OntologyClassInput:
+      type: object
+      required: [label, description]
+      properties:
+        label: { type: string, minLength: 1 }
+        description: { type: string }
+        parentClass: { type: string }
+        attributes:
+          type: array
+          items:
+            $ref: "#/components/schemas/OntologyAttribute"
+
+    OntologyClassUpdate:
+      type: object
+      properties:
+        label: { type: string }
+        description: { type: string }
+        parentClass: { type: string }
+        deprecated: { type: boolean }
+        attributes:
+          type: array
+          items:
+            $ref: "#/components/schemas/OntologyAttribute"
+
+    OntologyRelationship:
+      type: object
+      required: [id, label, domain, range, deprecated]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        domain: { type: string, description: "Source class id" }
+        range: { type: string, description: "Target class id" }
+        description: { type: ["string", "null"] }
+        deprecated: { type: boolean }
+
+    OntologyRelationshipInput:
+      type: object
+      required: [label, domain, range]
+      properties:
+        label: { type: string, minLength: 1 }
+        domain: { type: string }
+        range: { type: string }
+        description: { type: string }
+
+    Ontology:
+      type: object
+      required: [version, status, classes, relationships, updatedAt]
+      properties:
+        version: { type: string }
+        status:
+          type: string
+          enum: [draft, published]
+        classes:
+          type: array
+          items:
+            $ref: "#/components/schemas/OntologyClass"
+        relationships:
+          type: array
+          items:
+            $ref: "#/components/schemas/OntologyRelationship"
+        updatedAt: { type: string }
+
+    OntologyTurtle:
+      type: object
+      required: [turtle, version]
+      properties:
+        turtle: { type: string }
+        version: { type: string }
+
+    OntologyValidationIssue:
+      type: object
+      required: [severity, message]
+      properties:
+        severity:
+          type: string
+          enum: [error, warning]
+        message: { type: string }
+        target: { type: ["string", "null"] }
+
+    OntologyImpact:
+      type: object
+      required: [target, ruleCount, nodeCount, message]
+      properties:
+        target: { type: string }
+        ruleCount: { type: integer }
+        nodeCount: { type: integer }
+        message: { type: string }
+
+    OntologyValidationResult:
+      type: object
+      required: [valid, issues, impacts]
+      properties:
+        valid: { type: boolean }
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/OntologyValidationIssue"
+        impacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/OntologyImpact"
+
+    OntologyPublishInput:
+      type: object
+      required: [note]
+      properties:
+        note: { type: string, minLength: 1 }
+        author: { type: string }
+
+    OntologyVersion:
+      type: object
+      required: [version, status, note, createdAt]
+      properties:
+        version: { type: string }
+        status:
+          type: string
+          enum: [draft, published, superseded]
+        note: { type: string }
+        author: { type: ["string", "null"] }
+        createdAt: { type: string }
+        classCount: { type: integer }
+        relationshipCount: { type: integer }
+
+    GraphNode:
+      type: object
+      required: [id, type, label, properties]
+      properties:
+        id: { type: string }
+        type: { type: string, description: "Ontology class id" }
+        label: { type: string }
+        properties:
+          type: object
+          additionalProperties: true
+
+    GraphEdge:
+      type: object
+      required: [id, source, target, label]
+      properties:
+        id: { type: string }
+        source: { type: string }
+        target: { type: string }
+        label: { type: string }
+
+    GraphData:
+      type: object
+      required: [nodes, edges]
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphNode"
+        edges:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphEdge"
+
+    GraphNodeUpdate:
+      type: object
+      required: [properties]
+      properties:
+        properties:
+          type: object
+          additionalProperties: true
+
+    SapStatus:
+      type: object
+      required: [mode, configured]
+      properties:
+        mode:
+          type: string
+          enum: [mock, live]
+        configured: { type: boolean }
+        baseUrl: { type: ["string", "null"] }
+        notificationType: { type: string }
+
+    SapNotification:
+      type: object
+      required: [id, recommendationId, status, createdAt, payload]
+      properties:
+        id: { type: string }
+        recommendationId: { type: string }
+        notificationNumber: { type: ["string", "null"] }
+        status:
+          type: string
+          enum: [success, failed]
+        mode:
+          type: string
+          enum: [mock, live]
+        errorMessage: { type: ["string", "null"] }
+        payload:
+          type: object
+          additionalProperties: true
+        createdAt: { type: string }
+
+    ActivityEvent:
+      type: object
+      required: [id, timestamp, type, description]
+      properties:
+        id: { type: string }
+        timestamp: { type: string }
+        type:
+          type: string
+          enum: [recommendation, approval, rejection, sap_push, pipeline, ontology, backtest]
+        description: { type: string }
+        engineId: { type: ["string", "null"] }
+        recommendationId: { type: ["string", "null"] }
+
+    DashboardStatusCounts:
+      type: object
+      required: [operational, monitor, actionRequired, grounded]
+      properties:
+        operational: { type: integer }
+        monitor: { type: integer }
+        actionRequired: { type: integer }
+        grounded: { type: integer }
+
+    DashboardPriorityCounts:
+      type: object
+      required: [routine, expedite, urgent, aog]
+      properties:
+        routine: { type: integer }
+        expedite: { type: integer }
+        urgent: { type: integer }
+        aog: { type: integer }
+
+    FleetRisk:
+      type: object
+      required: [esn, model, healthScore, topFailureMode]
+      properties:
+        esn: { type: string }
+        model: { type: string }
+        healthScore: { type: integer }
+        topFailureMode: { type: string }
+
+    DashboardSummary:
+      type: object
+      required:
+        - fleetSize
+        - statusCounts
+        - priorityCounts
+        - pendingRecommendations
+        - pushedToSap
+        - avgHealthScore
+        - topRisks
+      properties:
+        fleetSize: { type: integer }
+        statusCounts: { $ref: "#/components/schemas/DashboardStatusCounts" }
+        priorityCounts: { $ref: "#/components/schemas/DashboardPriorityCounts" }
+        pendingRecommendations: { type: integer }
+        approvedRecommendations: { type: integer }
+        pushedToSap: { type: integer }
+        avgHealthScore: { type: integer }
+        topRisks:
+          type: array
+          items:
+            $ref: "#/components/schemas/FleetRisk"
+
+    BacktestInput:
+      type: object
+      required: [engineId]
+      properties:
+        engineId: { type: string }
+        name: { type: string }
+
+    BacktestResultRow:
+      type: object
+      required: [cycle, predicted, actual, outcome]
+      properties:
+        cycle: { type: integer }
+        predicted: { type: boolean }
+        actual: { type: boolean }
+        outcome:
+          type: string
+          enum: [true_positive, false_positive, true_negative, false_negative]
+        note: { type: ["string", "null"] }
+
+    BacktestRun:
+      type: object
+      required:
+        - id
+        - name
+        - engineId
+        - failureMode
+        - totalCycles
+        - leadTimeCycles
+        - precision
+        - recall
+        - createdAt
+        - rows
+      properties:
+        id: { type: string }
+        name: { type: string }
+        engineId: { type: string }
+        failureMode: { type: string }
+        totalCycles: { type: integer }
+        recommendationsGenerated: { type: integer }
+        recordedActions: { type: integer }
+        leadTimeCycles: { type: integer, description: "Cycles of early warning before recorded action" }
+        precision: { type: number }
+        recall: { type: number }
+        createdAt: { type: string }
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/BacktestResultRow"

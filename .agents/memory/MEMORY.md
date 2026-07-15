@@ -1,0 +1,2 @@
+- [Kùzu on Nix + pnpm](kuzu-on-nix.md) — native graph module works, but needs onlyBuiltDependencies allowlist + esbuild external + a possibly-manual install.js prebuild.
+- [Carbon Sass theme config](carbon-theme-config.md) — pass the theme map `themes.$g10`, not the string `'g10'`; `$use-font-face`/`$font-path` are not overridable in the installed version.

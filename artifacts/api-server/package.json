@@ -12,7 +12,9 @@
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
+    "@workspace/mro-core": "workspace:*",
     "cookie-parser": "^1.4.7",
+    "kuzu": "^0.11.3",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",
     "express": "^5.2.1",
