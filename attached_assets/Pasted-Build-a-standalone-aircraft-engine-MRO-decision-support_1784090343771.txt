@@ -1,0 +1,128 @@
+Build a standalone aircraft engine MRO decision-support application with the following architecture:
+
+CONTEXT
+This application ingests aircraft engine sensor/health data, reasons over it using
+a domain ontology and knowledge graph, and produces MRO (Maintenance, Repair, Overhaul)
+work recommendations. Outputs must serve two consumers: (a) human maintenance planners
+via a readable dashboard/report, and (b) SAP S/4HANA Cloud via a structured API integration.
+The application must run fully standalone — SAP is a downstream consumer, not a dependency.
+
+SCOPE (v1 — narrow vertical slice)
+- One engine type, 2-3 monitored failure modes (e.g., EGT margin erosion, vibration
+  exceedance, oil pressure/consumption trend) using standard Engine Condition Trend
+  Monitoring (ECTM) parameters: EGT, N1/N2, fuel flow, oil pressure/temp, vibration.
+
+LAYER 1 — ONTOLOGY
+- Define an OWL/RDF ontology (or equivalent typed schema) with core classes: Asset/Engine,
+  Component/LRU, Sensor/Parameter, Condition/Fault, MaintenanceTask, WorkOrder,
+  RegulatoryRequirement, Personnel/Skill.
+- Align class structure and task coding to ATA chapter numbering and S1000D/iSpec 2200
+  task card conventions so outputs map cleanly onto existing MRO documentation standards.
+- Define relationships: monitors, indicates, triggers, requires, isPartOf, compliesWith,
+  supersedes.
+- Store ontology as a versioned schema file (Turtle/OWL) separate from application code.
+
+LAYER 2 — KNOWLEDGE GRAPH
+- Use a graph database (Neo4j, or an RDF triple store if strict OWL reasoning is needed)
+  to instantiate the ontology with real engine, sensor, and historical maintenance data.
+- Build an ingestion pipeline that maps incoming sensor telemetry and historical
+  maintenance records into graph nodes/edges.
+- Support versioned/temporal data (sensor readings over time, not just current state).
+
+LAYER 3 — RULES / REASONING ENGINE
+- Implement a rule layer (SWRL, or a rules engine like Drools, or a lightweight
+  custom rules DSL) encoding ECTM-style trigger logic: e.g., "IF EGT margin < threshold
+  for N consecutive cycles THEN trigger borescope inspection task."
+- Rules should reference graph entities, not hardcoded values, so thresholds/rules can
+  be updated without code changes.
+- Include a confidence/severity score and a full traceability chain (which reading,
+  which rule, which regulatory reference triggered the recommendation) for every
+  generated recommendation.
+
+LAYER 4 — DECISION / WORK ORDER GENERATION SERVICE
+- Given a triggered condition, generate a structured "MRO Work Recommendation" object
+  containing: engine ID, component, fault description, recommended task(s) with
+  task codes, urgency/priority, required skills, estimated duration, supporting
+  evidence (sensor readings, rule fired, timestamp), and regulatory citation if applicable.
+- Expose this as an internal API/service, decoupled from output formatting, using a
+  canonical JSON schema as the single source of truth for both downstream outputs
+  (human report and SAP payload).
+
+LAYER 5A — HUMAN OUTPUT
+- Build a dashboard (web app) showing: engine health status, active recommendations,
+  evidence/traceability drill-down, and ability for a planner to approve/edit/reject
+  before it's finalized.
+- Include a printable/exportable report view (PDF or structured document) per
+  recommendation, formatted similarly to a maintenance task card.
+- Include a staging/review queue: no recommendation is pushed to SAP without either
+  human approval or an explicitly configured auto-approval threshold for
+  high-confidence rules.
+
+LAYER 5B — SAP S/4HANA CLOUD INTEGRATION
+- Confirmed target: SAP S/4HANA Cloud (Public Edition). This is API-first — use
+  OData V2/V4 APIs exclusively via SAP's Communication Scenario framework. Do NOT
+  build BAPI, RFC, or IDoc integration (those are ECC/on-prem patterns and not
+  applicable here).
+- Architecture: side-by-side extensibility. Build the core application independently
+  (on any cloud host, or SAP BTP if preferred) with a thin integration service calling
+  S/4HANA Cloud's public APIs. Do not embed logic inside the S/4HANA system itself.
+
+  Specific APIs:
+  - Primary: "Maintenance Notification" OData API (SAP API Business Hub) — creates
+    notifications equivalent to transaction IW21/IW22. Use this as the default entry
+    point for all recommendations ("something is wrong, please review").
+  - Secondary/optional: "Maintenance Order" OData API (create/change/delete supported
+    S/4HANA 2022+) — reserve for high-confidence, pre-approved rule triggers only,
+    not exploratory recommendations.
+
+  Authentication & setup (document for client's SAP Basis/security team — happens on
+  SAP side, not in app code):
+  - Requires: a Communication System (representing this app as an external system),
+    a Communication User (OAuth 2.0 client credentials recommended for a backend
+    service), and a Communication Arrangement binding the relevant Communication
+    Scenario (e.g., "Maintenance Notification Integration") to the Communication System.
+  - App authenticates via OAuth 2.0 client credentials flow against the token
+    endpoint defined in the Communication Arrangement.
+  - All connection values (client ID/secret, token URL, API base URL) must be
+    configurable via environment variables/secrets — never hardcoded — since sandbox,
+    test, and production tenants will differ.
+
+  Data flow:
+  - Canonical "MRO Work Order" JSON (Layer 4) → SAP adapter → maps to Maintenance
+    Notification OData payload (equipment ID/functional location, notification type,
+    problem/cause/damage codes, short/long text, priority) → POST via OData.
+  - On success, store returned SAP notification number back into the internal record
+    for two-way traceability.
+  - On failure, log and route to manual-review queue rather than dropping silently.
+
+  Testing:
+  - Develop and validate against the SAP S/4HANA Cloud public sandbox available via
+    SAP API Business Hub (api.sap.com) before connecting to any real tenant.
+  - Include a mock/stub mode so the rest of the application can be built and demoed
+    without any live SAP connection, since sandbox/production access may be arranged
+    in parallel with development.
+
+NON-FUNCTIONAL REQUIREMENTS
+- Every recommendation must be fully traceable/explainable end-to-end: raw sensor
+  value → rule fired → recommendation → (if applicable) SAP notification number.
+- Modular architecture: ontology, graph, rules engine, decision service, and each
+  output adapter (dashboard, SAP) must be independently testable and replaceable.
+- Provide a backtesting mode: run historical sensor data through the pipeline and
+  compare generated recommendations against actual historical maintenance actions
+  to validate rule accuracy before going live.
+
+DELIVERABLES FOR THIS PHASE
+1. Ontology schema file (Turtle/OWL) with documentation of classes/relationships.
+2. Data ingestion + graph population pipeline, with sample synthetic engine data.
+3. Rules engine with 2-3 working ECTM-style rules.
+4. Decision service producing canonical Work Recommendation JSON objects.
+5. Basic dashboard for human review with approval workflow.
+6. SAP S/4HANA Cloud OData adapter (Maintenance Notification creation, at minimum)
+   with mock mode and sandbox-tested real integration.
+7. README covering architecture decisions, SAP setup steps required from the client's
+   Basis team, and how to extend to additional failure modes/engine types.
+
+Ask clarifying questions before starting if: (a) sample sensor data format/schema is
+not provided, or (b) SAP sandbox/API Business Hub credentials are not yet available
+(in this case, build fully against mock mode and flag SAP live-testing as a
+follow-on phase).
