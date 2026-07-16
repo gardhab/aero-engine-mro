@@ -13,6 +13,16 @@ export interface Error {
   error: string;
 }
 
+export interface DocumentIssue {
+  field: string;
+  message: string;
+}
+
+export interface ValidationError {
+  error: string;
+  issues?: DocumentIssue[];
+}
+
 export type EngineStatus = typeof EngineStatus[keyof typeof EngineStatus];
 
 
@@ -478,6 +488,198 @@ export interface SapNotification {
   createdAt: string;
 }
 
+export type ExchangeStatus = typeof ExchangeStatus[keyof typeof ExchangeStatus];
+
+
+export const ExchangeStatus = {
+  recommended: 'recommended',
+  sent: 'sent',
+  accepted: 'accepted',
+  in_work: 'in_work',
+  released: 'released',
+  rejected: 'rejected',
+} as const;
+
+export interface ModuleDirective {
+  module: string;
+  actionRequired: string;
+}
+
+export interface ComplianceDirectiveItem {
+  reference: string;
+  category: string;
+  description: string;
+}
+
+export interface MaterialPolicy {
+  partsSupply: string;
+  materialClass: string;
+  /** @nullable */
+  scrapPolicy: string | null;
+}
+
+export interface ServiceRequestHeader {
+  documentId: string;
+  transmissionDate: string;
+  originator: string;
+  recipient: string;
+  contractType: string;
+}
+
+export interface AssetDetails {
+  engineModel: string;
+  esn: string;
+  flightHours: number;
+  flightCycles: number;
+}
+
+export interface ServiceRequestWorkScope {
+  primaryReason: string;
+  targetTatDays: number;
+  /** @nullable */
+  targetInductionDate: string | null;
+  /** @nullable */
+  targetReleaseDate: string | null;
+  directives: ModuleDirective[];
+  complianceDirectives: ComplianceDirectiveItem[];
+  materialPolicy: MaterialPolicy | null;
+}
+
+export interface EngineServiceRequest {
+  header: ServiceRequestHeader;
+  asset: AssetDetails;
+  workScope: ServiceRequestWorkScope;
+}
+
+export interface FeasibilityFlag {
+  reference: string;
+  feasible: boolean;
+  /** @nullable */
+  note: string | null;
+}
+
+export interface AcceptanceLogistics {
+  /** @nullable */
+  shopOrder: string | null;
+  /** @nullable */
+  bayAllocation: string | null;
+  /** @nullable */
+  uncratingDate: string | null;
+}
+
+export type InductionAcceptanceInductionStatus = typeof InductionAcceptanceInductionStatus[keyof typeof InductionAcceptanceInductionStatus];
+
+
+export const InductionAcceptanceInductionStatus = {
+  accepted: 'accepted',
+  rejected: 'rejected',
+} as const;
+
+export interface InductionAcceptance {
+  documentId: string;
+  associatedRequestId: string;
+  issueDate: string;
+  inductionStatus: InductionAcceptanceInductionStatus;
+  logistics: AcceptanceLogistics;
+  targetTatDays: number;
+  committedTatDays: number;
+  /** @nullable */
+  committedReleaseDate: string | null;
+  feasibility: FeasibilityFlag[];
+  /** @nullable */
+  unscheduledCostCapUsd: number | null;
+  /** @nullable */
+  signature: string | null;
+  /** @nullable */
+  signedAt: string | null;
+}
+
+export interface ShopVisitExchange {
+  id: string;
+  recommendationId: string;
+  engineId: string;
+  engineModel: string;
+  tailNumber: string;
+  mroProvider: string;
+  status: ExchangeStatus;
+  documentId: string;
+  request: EngineServiceRequest;
+  requestXml: string;
+  acknowledgement: InductionAcceptance | null;
+  targetTatDays: number;
+  /** @nullable */
+  committedTatDays: number | null;
+  /** @nullable */
+  tatDeviationDays: number | null;
+  /** @nullable */
+  shopOrder: string | null;
+  /** @nullable */
+  unscheduledCostCapUsd: number | null;
+  createdAt: string;
+  updatedAt: string;
+  /** @nullable */
+  sentAt: string | null;
+  /** @nullable */
+  acceptedAt: string | null;
+  /** @nullable */
+  releasedAt: string | null;
+}
+
+export type ShopVisitExchangeSummaryInductionStatus = typeof ShopVisitExchangeSummaryInductionStatus[keyof typeof ShopVisitExchangeSummaryInductionStatus] | null;
+
+
+export const ShopVisitExchangeSummaryInductionStatus = {
+  accepted: 'accepted',
+  rejected: 'rejected',
+} as const;
+
+export interface ShopVisitExchangeSummary {
+  id: string;
+  recommendationId: string;
+  engineId: string;
+  engineModel: string;
+  tailNumber: string;
+  mroProvider: string;
+  status: ExchangeStatus;
+  documentId: string;
+  inductionStatus: ShopVisitExchangeSummaryInductionStatus;
+  targetTatDays: number;
+  /** @nullable */
+  committedTatDays: number | null;
+  /** @nullable */
+  tatDeviationDays: number | null;
+  /** @nullable */
+  shopOrder: string | null;
+  /** @nullable */
+  unscheduledCostCapUsd: number | null;
+  createdAt: string;
+  updatedAt: string;
+  /** @nullable */
+  sentAt: string | null;
+  /** @nullable */
+  acceptedAt: string | null;
+  /** @nullable */
+  releasedAt: string | null;
+}
+
+export type IngestAcknowledgementInputFormat = typeof IngestAcknowledgementInputFormat[keyof typeof IngestAcknowledgementInputFormat];
+
+
+export const IngestAcknowledgementInputFormat = {
+  json: 'json',
+  xml: 'xml',
+  auto: 'auto',
+} as const;
+
+export interface IngestAcknowledgementInput {
+  document: string;
+  format?: IngestAcknowledgementInputFormat;
+}
+
+export interface AdvanceExchangeInput {
+  status: ExchangeStatus;
+}
+
 export type ActivityEventType = typeof ActivityEventType[keyof typeof ActivityEventType];
 
 
@@ -489,6 +691,7 @@ export const ActivityEventType = {
   pipeline: 'pipeline',
   ontology: 'ontology',
   backtest: 'backtest',
+  exchange: 'exchange',
 } as const;
 
 export interface ActivityEvent {
@@ -583,6 +786,16 @@ export type NotFoundResponse = Error;
  * Bad request
  */
 export type BadRequestResponse = Error;
+
+/**
+ * Conflict with current state
+ */
+export type ConflictResponse = Error;
+
+/**
+ * Document validation failed
+ */
+export type ValidationFailedResponse = ValidationError;
 
 export type GetEngineReadingsParams = {
 /**

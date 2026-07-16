@@ -5,17 +5,9 @@
  * Aircraft Engine MRO Decision Support API. Ingests engine condition data, reasons over it with a domain ontology, knowledge graph and rules engine, and produces traceable MRO Work Recommendations for human planners and for SAP S/4HANA Cloud (mock mode).
  * OpenAPI spec version: 0.1.0
  */
+import type { Error } from './error';
 
-export type ActivityEventType = typeof ActivityEventType[keyof typeof ActivityEventType];
-
-
-export const ActivityEventType = {
-  recommendation: 'recommendation',
-  approval: 'approval',
-  rejection: 'rejection',
-  sap_push: 'sap_push',
-  pipeline: 'pipeline',
-  ontology: 'ontology',
-  backtest: 'backtest',
-  exchange: 'exchange',
-} as const;
+/**
+ * Conflict with current state
+ */
+export type ConflictResponse = Error;

@@ -280,6 +280,128 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /recommendations/{id}/dispatch:
+    post:
+      operationId: dispatchRecommendation
+      tags: [recommendations, exchange]
+      summary: Dispatch an approved recommendation to an MRO shop as an Engine Service Request (TSR)
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: The created shop-visit exchange
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShopVisitExchange"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /recommendations/{id}/exchange:
+    get:
+      operationId: getRecommendationExchange
+      tags: [recommendations, exchange]
+      summary: Get the shop-visit exchange for a recommendation, if one exists
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: The shop-visit exchange
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShopVisitExchange"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /exchanges:
+    get:
+      operationId: listExchanges
+      tags: [exchange]
+      summary: List shop-visit exchanges
+      responses:
+        "200":
+          description: Shop-visit exchanges
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ShopVisitExchangeSummary"
+
+  /exchanges/{id}:
+    get:
+      operationId: getExchange
+      tags: [exchange]
+      summary: Get one shop-visit exchange with full TSR and acknowledgement
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: The shop-visit exchange
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShopVisitExchange"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /exchanges/{id}/acknowledgement:
+    post:
+      operationId: ingestAcknowledgement
+      tags: [exchange]
+      summary: Ingest and validate an MRO Induction Acceptance (JSON or XML)
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestAcknowledgementInput"
+      responses:
+        "200":
+          description: The updated shop-visit exchange
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShopVisitExchange"
+        "400":
+          $ref: "#/components/responses/ValidationFailed"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /exchanges/{id}/advance:
+    post:
+      operationId: advanceExchange
+      tags: [exchange]
+      summary: Advance the shop-visit exchange lifecycle to the next status
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdvanceExchangeInput"
+      responses:
+        "200":
+          description: The updated shop-visit exchange
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShopVisitExchange"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
   /pipeline/run:
     post:
       operationId: runPipeline
@@ -672,6 +794,18 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Conflict with current state
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ValidationFailed:
+      description: Document validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
 
   schemas:
     HealthStatus:
@@ -688,6 +822,23 @@ components:
       properties:
         error:
           type: string
+
+    DocumentIssue:
+      type: object
+      required: [field, message]
+      properties:
+        field: { type: string }
+        message: { type: string }
+
+    ValidationError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentIssue"
 
     EngineStatus:
       type: string
@@ -1182,6 +1333,199 @@ components:
           additionalProperties: true
         createdAt: { type: string }
 
+    ExchangeStatus:
+      type: string
+      enum: [recommended, sent, accepted, in_work, released, rejected]
+
+    ModuleDirective:
+      type: object
+      required: [module, actionRequired]
+      properties:
+        module: { type: string }
+        actionRequired: { type: string }
+
+    ComplianceDirectiveItem:
+      type: object
+      required: [reference, category, description]
+      properties:
+        reference: { type: string }
+        category: { type: string }
+        description: { type: string }
+
+    MaterialPolicy:
+      type: object
+      required: [partsSupply, materialClass, scrapPolicy]
+      properties:
+        partsSupply: { type: string }
+        materialClass: { type: string }
+        scrapPolicy: { type: ["string", "null"] }
+
+    ServiceRequestHeader:
+      type: object
+      required: [documentId, transmissionDate, originator, recipient, contractType]
+      properties:
+        documentId: { type: string }
+        transmissionDate: { type: string }
+        originator: { type: string }
+        recipient: { type: string }
+        contractType: { type: string }
+
+    AssetDetails:
+      type: object
+      required: [engineModel, esn, flightHours, flightCycles]
+      properties:
+        engineModel: { type: string }
+        esn: { type: string }
+        flightHours: { type: number }
+        flightCycles: { type: integer }
+
+    ServiceRequestWorkScope:
+      type: object
+      required: [primaryReason, targetTatDays, targetInductionDate, targetReleaseDate, directives, complianceDirectives, materialPolicy]
+      properties:
+        primaryReason: { type: string }
+        targetTatDays: { type: integer }
+        targetInductionDate: { type: ["string", "null"] }
+        targetReleaseDate: { type: ["string", "null"] }
+        directives:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleDirective"
+        complianceDirectives:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComplianceDirectiveItem"
+        materialPolicy:
+          oneOf:
+            - $ref: "#/components/schemas/MaterialPolicy"
+            - type: "null"
+
+    EngineServiceRequest:
+      type: object
+      required: [header, asset, workScope]
+      properties:
+        header:
+          $ref: "#/components/schemas/ServiceRequestHeader"
+        asset:
+          $ref: "#/components/schemas/AssetDetails"
+        workScope:
+          $ref: "#/components/schemas/ServiceRequestWorkScope"
+
+    FeasibilityFlag:
+      type: object
+      required: [reference, feasible, note]
+      properties:
+        reference: { type: string }
+        feasible: { type: boolean }
+        note: { type: ["string", "null"] }
+
+    AcceptanceLogistics:
+      type: object
+      required: [shopOrder, bayAllocation, uncratingDate]
+      properties:
+        shopOrder: { type: ["string", "null"] }
+        bayAllocation: { type: ["string", "null"] }
+        uncratingDate: { type: ["string", "null"] }
+
+    InductionAcceptance:
+      type: object
+      required: [documentId, associatedRequestId, issueDate, inductionStatus, logistics, targetTatDays, committedTatDays, committedReleaseDate, feasibility, unscheduledCostCapUsd, signature, signedAt]
+      properties:
+        documentId: { type: string }
+        associatedRequestId: { type: string }
+        issueDate: { type: string }
+        inductionStatus:
+          type: string
+          enum: [accepted, rejected]
+        logistics:
+          $ref: "#/components/schemas/AcceptanceLogistics"
+        targetTatDays: { type: integer }
+        committedTatDays: { type: integer }
+        committedReleaseDate: { type: ["string", "null"] }
+        feasibility:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeasibilityFlag"
+        unscheduledCostCapUsd: { type: ["number", "null"] }
+        signature: { type: ["string", "null"] }
+        signedAt: { type: ["string", "null"] }
+
+    ShopVisitExchange:
+      type: object
+      required: [id, recommendationId, engineId, engineModel, tailNumber, mroProvider, status, documentId, request, requestXml, acknowledgement, targetTatDays, committedTatDays, tatDeviationDays, shopOrder, unscheduledCostCapUsd, createdAt, updatedAt, sentAt, acceptedAt, releasedAt]
+      properties:
+        id: { type: string }
+        recommendationId: { type: string }
+        engineId: { type: string }
+        engineModel: { type: string }
+        tailNumber: { type: string }
+        mroProvider: { type: string }
+        status:
+          $ref: "#/components/schemas/ExchangeStatus"
+        documentId: { type: string }
+        request:
+          $ref: "#/components/schemas/EngineServiceRequest"
+        requestXml: { type: string }
+        acknowledgement:
+          oneOf:
+            - $ref: "#/components/schemas/InductionAcceptance"
+            - type: "null"
+        targetTatDays: { type: integer }
+        committedTatDays: { type: ["integer", "null"] }
+        tatDeviationDays: { type: ["integer", "null"] }
+        shopOrder: { type: ["string", "null"] }
+        unscheduledCostCapUsd: { type: ["number", "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+        sentAt: { type: ["string", "null"] }
+        acceptedAt: { type: ["string", "null"] }
+        releasedAt: { type: ["string", "null"] }
+
+    ShopVisitExchangeSummary:
+      type: object
+      required: [id, recommendationId, engineId, engineModel, tailNumber, mroProvider, status, documentId, inductionStatus, targetTatDays, committedTatDays, tatDeviationDays, shopOrder, unscheduledCostCapUsd, createdAt, updatedAt, sentAt, acceptedAt, releasedAt]
+      properties:
+        id: { type: string }
+        recommendationId: { type: string }
+        engineId: { type: string }
+        engineModel: { type: string }
+        tailNumber: { type: string }
+        mroProvider: { type: string }
+        status:
+          $ref: "#/components/schemas/ExchangeStatus"
+        documentId: { type: string }
+        inductionStatus:
+          oneOf:
+            - type: string
+              enum: [accepted, rejected]
+            - type: "null"
+        targetTatDays: { type: integer }
+        committedTatDays: { type: ["integer", "null"] }
+        tatDeviationDays: { type: ["integer", "null"] }
+        shopOrder: { type: ["string", "null"] }
+        unscheduledCostCapUsd: { type: ["number", "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+        sentAt: { type: ["string", "null"] }
+        acceptedAt: { type: ["string", "null"] }
+        releasedAt: { type: ["string", "null"] }
+
+    IngestAcknowledgementInput:
+      type: object
+      required: [document]
+      properties:
+        document: { type: string }
+        format:
+          type: string
+          enum: [json, xml, auto]
+
+    AdvanceExchangeInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/ExchangeStatus"
+
     ActivityEvent:
       type: object
       required: [id, timestamp, type, description]
@@ -1190,7 +1534,7 @@ components:
         timestamp: { type: string }
         type:
           type: string
-          enum: [recommendation, approval, rejection, sap_push, pipeline, ontology, backtest]
+          enum: [recommendation, approval, rejection, sap_push, pipeline, ontology, backtest, exchange]
         description: { type: string }
         engineId: { type: ["string", "null"] }
         recommendationId: { type: ["string", "null"] }

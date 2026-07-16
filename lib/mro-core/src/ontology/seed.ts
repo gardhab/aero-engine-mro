@@ -139,6 +139,46 @@ export const SEED_CLASSES: Omit<
       { name: "citation", type: "string", description: "Citation identifier" },
     ],
   },
+  {
+    id: "ServiceRequest",
+    label: "Engine Service Request",
+    description:
+      "A Spec 2000 Ch.4 Technical Service Request (TSR) dispatched from the OEM to an MRO shop for a directed shop visit.",
+    parentClass: null,
+    deprecated: false,
+    attributes: [
+      { name: "documentId", type: "string", description: "TSR document control number" },
+      { name: "status", type: "string", description: "Exchange lifecycle status" },
+      { name: "mroProvider", type: "string", description: "Receiving MRO facility" },
+      { name: "targetTatDays", type: "integer", description: "Target turnaround (days)" },
+    ],
+  },
+  {
+    id: "ComplianceDirective",
+    label: "Compliance Directive",
+    description:
+      "A mandatory airworthiness directive (AD) or service bulletin (SB) required during a shop visit.",
+    parentClass: null,
+    deprecated: false,
+    attributes: [
+      { name: "reference", type: "string", description: "AD/SB reference number" },
+      { name: "category", type: "string", description: "Mandatory / Service Bulletin / Standard" },
+    ],
+  },
+  {
+    id: "MroCommitment",
+    label: "MRO Commitment",
+    description:
+      "The MRO's induction acceptance: committed turnaround, slot allocation, feasibility, and cost cap.",
+    parentClass: null,
+    deprecated: false,
+    attributes: [
+      { name: "shopOrder", type: "string", description: "Allocated MRO shop order" },
+      { name: "committedTatDays", type: "integer", description: "Committed turnaround (days)" },
+      { name: "tatDeviationDays", type: "integer", description: "Deviation vs target (days)" },
+      { name: "unscheduledCostCapUsd", type: "number", description: "Pre-authorized cost cap (USD)" },
+    ],
+  },
 ];
 
 export const SEED_RELATIONSHIPS: OntologyRelationship[] = [
@@ -228,6 +268,38 @@ export const SEED_RELATIONSHIPS: OntologyRelationship[] = [
     domain: "MaintenanceTask",
     range: "RegulatoryReference",
     description: "A task is governed by regulatory references.",
+    deprecated: false,
+  },
+  {
+    id: "dispatchedAs",
+    label: "dispatched as",
+    domain: "Recommendation",
+    range: "ServiceRequest",
+    description: "An approved recommendation is dispatched to an MRO as a service request.",
+    deprecated: false,
+  },
+  {
+    id: "concerns",
+    label: "concerns",
+    domain: "ServiceRequest",
+    range: "Engine",
+    description: "A service request directs work on a specific engine.",
+    deprecated: false,
+  },
+  {
+    id: "mandates",
+    label: "mandates",
+    domain: "ServiceRequest",
+    range: "ComplianceDirective",
+    description: "A service request mandates incorporation of compliance directives.",
+    deprecated: false,
+  },
+  {
+    id: "acknowledgedBy",
+    label: "acknowledged by",
+    domain: "ServiceRequest",
+    range: "MroCommitment",
+    description: "A service request is acknowledged by the MRO's induction commitment.",
     deprecated: false,
   },
 ];

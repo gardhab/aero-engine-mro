@@ -5,7 +5,12 @@ import {
   useApproveRecommendation,
   useRejectRecommendation,
   usePushRecommendationToSap,
-  getGetRecommendationQueryKey
+  useDispatchRecommendation,
+  useGetRecommendationExchange,
+  useIngestAcknowledgement,
+  useAdvanceExchange,
+  getGetRecommendationQueryKey,
+  getGetRecommendationExchangeQueryKey
 } from '@workspace/api-client-react';
 import {
   Breadcrumb,
@@ -21,6 +26,7 @@ import {
   SkeletonPlaceholder,
   Modal,
   TextInput,
+  TextArea,
   StructuredListWrapper,
   StructuredListHead,
   StructuredListRow,
@@ -42,10 +48,28 @@ export default function RecommendationDetail() {
   const approveMut = useApproveRecommendation();
   const rejectMut = useRejectRecommendation();
   const pushMut = usePushRecommendationToSap();
+  const dispatchMut = useDispatchRecommendation();
+  const ingestMut = useIngestAcknowledgement();
+  const advanceMut = useAdvanceExchange();
+
+  const { data: exchange } = useGetRecommendationExchange(id, {
+    query: {
+      enabled: !!id,
+      queryKey: getGetRecommendationExchangeQueryKey(id),
+      retry: false,
+      throwOnError: false,
+    },
+  });
 
   const [reviewNotes, setReviewNotes] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showAckModal, setShowAckModal] = useState(false);
+  const [ackDocument, setAckDocument] = useState('');
   const [notification, setNotification] = useState<{ kind: any, title: string, subtitle: string } | null>(null);
+
+  const invalidateExchange = () => {
+    queryClient.invalidateQueries({ queryKey: getGetRecommendationExchangeQueryKey(id) });
+  };
 
   if (isLoading || !rec) {
     return <div className="page-container"><SkeletonPlaceholder style={{ width: '100%', height: '400px' }} /></div>;
@@ -82,8 +106,65 @@ export default function RecommendationDetail() {
     });
   };
 
+  const handleDispatch = () => {
+    dispatchMut.mutate({ id }, {
+      onSuccess: (data) => {
+        setNotification({ kind: 'success', title: 'Dispatched to MRO', subtitle: `Service request ${data.documentId} sent to ${data.mroProvider}.` });
+        invalidateExchange();
+      },
+      onError: (err) => {
+        setNotification({ kind: 'error', title: 'Dispatch Failed', subtitle: (err as any)?.data?.error || 'Unknown error' });
+      }
+    });
+  };
+
+  const handleIngest = () => {
+    ingestMut.mutate({ id: exchange!.id, data: { document: ackDocument, format: 'auto' } }, {
+      onSuccess: (data) => {
+        setShowAckModal(false);
+        setAckDocument('');
+        setNotification({
+          kind: data.status === 'accepted' ? 'success' : 'warning',
+          title: data.status === 'accepted' ? 'Induction Accepted' : 'Induction Rejected',
+          subtitle: data.status === 'accepted'
+            ? `Committed ${data.committedTatDays}d TAT (${(data.tatDeviationDays ?? 0) >= 0 ? '+' : ''}${data.tatDeviationDays}d vs target).`
+            : 'The MRO shop rejected the induction request.',
+        });
+        invalidateExchange();
+      },
+      onError: (err: any) => {
+        const issues = err?.data?.issues as { field?: string; message: string }[] | undefined;
+        setNotification({
+          kind: 'error',
+          title: 'Acknowledgement Rejected',
+          subtitle: issues?.length ? issues.map((i) => i.message).join(' ') : (err?.data?.error || 'Validation failed'),
+        });
+      }
+    });
+  };
+
+  const handleAdvance = (status: 'in_work' | 'released') => {
+    advanceMut.mutate({ id: exchange!.id, data: { status } }, {
+      onSuccess: () => {
+        setNotification({ kind: 'success', title: 'Shop Visit Updated', subtitle: `Status advanced to ${status.replace('_', ' ')}.` });
+        invalidateExchange();
+      },
+      onError: (err) => {
+        setNotification({ kind: 'error', title: 'Update Failed', subtitle: (err as any)?.data?.error || 'Unknown error' });
+      }
+    });
+  };
+
   const handlePrint = () => {
     window.print();
+  };
+
+  const canDispatch = (rec.status === 'approved' || rec.status === 'pushed') && !exchange;
+  const EXCHANGE_TAG: Record<string, any> = {
+    recommended: 'gray', sent: 'blue', accepted: 'teal', in_work: 'purple', released: 'green', rejected: 'red',
+  };
+  const EXCHANGE_LABEL: Record<string, string> = {
+    recommended: 'Recommended', sent: 'Sent', accepted: 'Accepted', in_work: 'In Work', released: 'Released', rejected: 'Rejected',
   };
 
   return (
@@ -127,6 +208,9 @@ export default function RecommendationDetail() {
           )}
           {rec.status === 'approved' && (
             <Button kind="primary" renderIcon={Send} onClick={handlePush} disabled={pushMut.isPending}>Push to SAP</Button>
+          )}
+          {canDispatch && (
+            <Button kind="tertiary" renderIcon={Send} onClick={handleDispatch} disabled={dispatchMut.isPending}>Dispatch to MRO</Button>
           )}
           <Button kind="ghost" renderIcon={Printer} hasIconOnly iconDescription="Print Task Card" onClick={handlePrint} />
         </div>
@@ -172,6 +256,61 @@ export default function RecommendationDetail() {
           <p className="mt-2 text-green-600"><strong>SAP Notification:</strong> {rec.sapNotificationNumber}</p>
         )}
       </Tile>
+
+      {exchange && (
+        <Tile className="mb-4">
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <h3 className="mb-1">MRO Shop Visit</h3>
+              <p><strong>{exchange.documentId}</strong> → {exchange.mroProvider}</p>
+            </div>
+            <div className="flex gap-2 items-center no-print">
+              <Tag size="lg" type={EXCHANGE_TAG[exchange.status]}>{EXCHANGE_LABEL[exchange.status]}</Tag>
+              {exchange.status === 'sent' && (
+                <Button kind="primary" size="sm" onClick={() => setShowAckModal(true)} disabled={ingestMut.isPending}>
+                  Ingest Acceptance
+                </Button>
+              )}
+              {exchange.status === 'accepted' && (
+                <Button kind="tertiary" size="sm" onClick={() => handleAdvance('in_work')} disabled={advanceMut.isPending}>
+                  Mark In Work
+                </Button>
+              )}
+              {exchange.status === 'in_work' && (
+                <Button kind="tertiary" size="sm" onClick={() => handleAdvance('released')} disabled={advanceMut.isPending}>
+                  Mark Released
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="dashboard-grid">
+            <div className="dashboard-col-3">
+              <div className="card-title">Target TAT</div>
+              <div>{exchange.targetTatDays} days</div>
+            </div>
+            <div className="dashboard-col-3">
+              <div className="card-title">Committed TAT</div>
+              <div>
+                {exchange.committedTatDays != null ? `${exchange.committedTatDays} days` : '—'}
+                {exchange.tatDeviationDays != null && exchange.tatDeviationDays !== 0 && (
+                  <Tag type={exchange.tatDeviationDays > 0 ? 'red' : 'green'} size="sm" className="ml-2">
+                    {exchange.tatDeviationDays > 0 ? '+' : ''}{exchange.tatDeviationDays}d
+                  </Tag>
+                )}
+              </div>
+            </div>
+            <div className="dashboard-col-3">
+              <div className="card-title">Shop Order</div>
+              <div>{exchange.shopOrder || '—'}</div>
+            </div>
+            <div className="dashboard-col-3">
+              <div className="card-title">Unscheduled Cost Cap</div>
+              <div>{exchange.unscheduledCostCapUsd != null ? `${exchange.unscheduledCostCapUsd.toLocaleString()}` : '—'}</div>
+            </div>
+          </div>
+          <p className="mt-3 no-print"><Link href="/exchanges">View all shop visits →</Link></p>
+        </Tile>
+      )}
 
       <Tabs>
         <TabList aria-label="Recommendation Details">
@@ -300,6 +439,31 @@ export default function RecommendationDetail() {
           value={reviewNotes}
           onChange={(e) => setReviewNotes(e.target.value)}
           placeholder="e.g. False positive, manual inspection cleared..."
+        />
+      </Modal>
+
+      <Modal
+        open={showAckModal}
+        modalHeading="Ingest MRO Induction Acceptance"
+        primaryButtonText={ingestMut.isPending ? 'Validating...' : 'Ingest & Validate'}
+        secondaryButtonText="Cancel"
+        primaryButtonDisabled={!ackDocument.trim() || ingestMut.isPending}
+        onRequestClose={() => setShowAckModal(false)}
+        onRequestSubmit={handleIngest}
+        size="lg"
+      >
+        <p className="mb-4">
+          Paste the MRO shop's Induction Acceptance document (JSON or Spec 2000 XML). It will be strictly
+          validated against the dispatched service request {exchange ? exchange.documentId : ''} before the
+          shop visit advances.
+        </p>
+        <TextArea
+          id="ack-document"
+          labelText="Acceptance document (JSON or XML)"
+          rows={12}
+          value={ackDocument}
+          onChange={(e) => setAckDocument(e.target.value)}
+          placeholder='{ "documentId": "...", "associatedRequestId": "...", "inductionStatus": "accepted", ... }'
         />
       </Modal>
     </div>

@@ -6,6 +6,7 @@ import type {
   Recommendation,
   Rule,
 } from "../types.js";
+import type { ShopVisitExchange } from "../exchange/types.js";
 import { PARAMETERS, PARAMETER_BY_CODE } from "../data/parameters.js";
 
 export interface GraphFilter {
@@ -22,6 +23,7 @@ export function buildGraph(
   engines: Engine[],
   recommendations: Recommendation[],
   rules: Rule[],
+  exchanges: ShopVisitExchange[] = [],
 ): GraphData {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
@@ -162,6 +164,78 @@ export function buildGraph(
         source: `rule:${rec.ruleId}`,
         target: recId,
         label: "generates",
+      });
+    }
+  }
+
+  // Shop-visit exchange nodes: the dispatched TSR, its mandated compliance
+  // directives, and (once acknowledged) the MRO's capacity commitment.
+  for (const ex of exchanges) {
+    const tsrId = `tsr:${ex.documentId}`;
+    addNode({
+      id: tsrId,
+      type: "ServiceRequest",
+      label: ex.documentId,
+      properties: {
+        engineId: ex.engineId,
+        status: ex.status,
+        mroProvider: ex.mroProvider,
+        primaryReason: ex.request.workScope.primaryReason,
+        targetTatDays: ex.targetTatDays,
+      },
+    });
+    if (nodeIds.has(`rec:${ex.recommendationId}`)) {
+      addEdge({
+        id: `e:${ex.recommendationId}:${ex.documentId}:dispatchedAs`,
+        source: `rec:${ex.recommendationId}`,
+        target: tsrId,
+        label: "dispatchedAs",
+      });
+    }
+    if (nodeIds.has(`engine:${ex.engineId}`)) {
+      addEdge({
+        id: `e:${ex.documentId}:${ex.engineId}:concerns`,
+        source: tsrId,
+        target: `engine:${ex.engineId}`,
+        label: "concerns",
+      });
+    }
+    for (const dir of ex.request.workScope.complianceDirectives) {
+      const cId = `compliance:${slug(dir.reference)}`;
+      addNode({
+        id: cId,
+        type: "ComplianceDirective",
+        label: dir.reference,
+        properties: { reference: dir.reference, category: dir.category },
+      });
+      addEdge({
+        id: `e:${ex.documentId}:${slug(dir.reference)}:mandates`,
+        source: tsrId,
+        target: cId,
+        label: "mandates",
+      });
+    }
+    if (ex.acknowledgement) {
+      const commitId = `commitment:${ex.id}`;
+      addNode({
+        id: commitId,
+        type: "MroCommitment",
+        label: `${ex.mroProvider}${ex.shopOrder ? ` · ${ex.shopOrder}` : ""}`,
+        properties: {
+          engineId: ex.engineId,
+          mroProvider: ex.mroProvider,
+          shopOrder: ex.shopOrder,
+          committedTatDays: ex.committedTatDays,
+          tatDeviationDays: ex.tatDeviationDays,
+          unscheduledCostCapUsd: ex.unscheduledCostCapUsd,
+          inductionStatus: ex.acknowledgement.inductionStatus,
+        },
+      });
+      addEdge({
+        id: `e:${ex.documentId}:${ex.id}:acknowledgedBy`,
+        source: tsrId,
+        target: commitId,
+        label: "acknowledgedBy",
       });
     }
   }

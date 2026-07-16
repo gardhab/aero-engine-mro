@@ -7,6 +7,7 @@ import {
   rulesTable,
   recommendationsTable,
   sapNotificationsTable,
+  shopVisitExchangesTable,
   activityTable,
 } from "@workspace/db";
 import {
@@ -25,7 +26,13 @@ import {
   type SapAdapter,
 } from "@workspace/mro-core";
 import { getGraphStore } from "./graph";
-import { toEngine, toReading, toRecommendation, toRule } from "./mappers";
+import {
+  toEngine,
+  toReading,
+  toRecommendation,
+  toRule,
+  toShopVisitExchange,
+} from "./mappers";
 import { logger } from "../logger";
 
 let sapAdapter: SapAdapter | null = null;
@@ -161,10 +168,12 @@ export async function rebuildGraphMerge(): Promise<void> {
   const engineRows = await db.select().from(enginesTable);
   const ruleRows = await db.select().from(rulesTable);
   const recRows = await db.select().from(recommendationsTable);
+  const exchangeRows = await db.select().from(shopVisitExchangesTable);
   const engines = engineRows.map((e) => toEngine(e, 0));
   const rules = ruleRows.map(toRule);
   const recs = recRows.map(toRecommendation);
-  const graph = buildGraph(engines, recs, rules);
+  const exchanges = exchangeRows.map(toShopVisitExchange);
+  const graph = buildGraph(engines, recs, rules, exchanges);
   await store.merge(graph);
 }
 
@@ -174,10 +183,12 @@ export async function rebuildGraphReplace(): Promise<void> {
   const engineRows = await db.select().from(enginesTable);
   const ruleRows = await db.select().from(rulesTable);
   const recRows = await db.select().from(recommendationsTable);
+  const exchangeRows = await db.select().from(shopVisitExchangesTable);
   const engines = engineRows.map((e) => toEngine(e, 0));
   const rules = ruleRows.map(toRule);
   const recs = recRows.map(toRecommendation);
-  await store.replaceAll(buildGraph(engines, recs, rules));
+  const exchanges = exchangeRows.map(toShopVisitExchange);
+  await store.replaceAll(buildGraph(engines, recs, rules, exchanges));
 }
 
 export interface SapPushOutcome {

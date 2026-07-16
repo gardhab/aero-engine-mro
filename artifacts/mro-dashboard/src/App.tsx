@@ -10,6 +10,7 @@ import RuleList from './pages/RuleList';
 import OntologyEditor from './pages/OntologyEditor';
 import GraphExplorer from './pages/GraphExplorer';
 import SapStatus from './pages/SapStatus';
+import ShopVisits from './pages/ShopVisits';
 import BacktestRuns from './pages/BacktestRuns';
 
 const queryClient = new QueryClient({
@@ -43,6 +44,7 @@ function Router() {
         <Route path="/ontology" component={OntologyEditor} />
         <Route path="/graph" component={GraphExplorer} />
         <Route path="/sap" component={SapStatus} />
+        <Route path="/exchanges" component={ShopVisits} />
         <Route path="/backtest" component={BacktestRuns} />
         <Route component={NotFound} />
       </Switch>

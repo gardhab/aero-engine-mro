@@ -6,16 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ActivityEventType = typeof ActivityEventType[keyof typeof ActivityEventType];
+export type ShopVisitExchangeSummaryInductionStatus = typeof ShopVisitExchangeSummaryInductionStatus[keyof typeof ShopVisitExchangeSummaryInductionStatus] | null;
 
 
-export const ActivityEventType = {
-  recommendation: 'recommendation',
-  approval: 'approval',
-  rejection: 'rejection',
-  sap_push: 'sap_push',
-  pipeline: 'pipeline',
-  ontology: 'ontology',
-  backtest: 'backtest',
-  exchange: 'exchange',
+export const ShopVisitExchangeSummaryInductionStatus = {
+  accepted: 'accepted',
+  rejected: 'rejected',
 } as const;

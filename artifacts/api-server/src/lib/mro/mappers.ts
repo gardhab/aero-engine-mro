@@ -7,6 +7,7 @@ import type {
   RecommendationRow,
   RuleRow,
   SapNotificationRow,
+  ShopVisitExchangeRow,
 } from "@workspace/db";
 import type {
   ActivityEvent,
@@ -14,6 +15,7 @@ import type {
   BacktestRun,
   Engine,
   EngineStatus,
+  ExchangeStatus,
   Ontology,
   ParameterReading,
   Priority,
@@ -22,6 +24,8 @@ import type {
   Rule,
   RuleOperator,
   SapNotification,
+  ShopVisitExchange,
+  ShopVisitExchangeSummary,
 } from "@workspace/mro-core";
 
 export function toEngine(row: EngineRow, openRecommendations: number): Engine {
@@ -118,6 +122,58 @@ export function toSapNotification(row: SapNotificationRow): SapNotification {
     errorMessage: row.errorMessage,
     payload: row.payload,
     createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export function toShopVisitExchange(row: ShopVisitExchangeRow): ShopVisitExchange {
+  return {
+    id: row.id,
+    recommendationId: row.recommendationId,
+    engineId: row.engineId,
+    engineModel: row.engineModel,
+    tailNumber: row.tailNumber,
+    mroProvider: row.mroProvider,
+    status: row.status as ExchangeStatus,
+    documentId: row.documentId,
+    request: row.request,
+    requestXml: row.requestXml,
+    acknowledgement: row.acknowledgement ?? null,
+    targetTatDays: row.targetTatDays,
+    committedTatDays: row.committedTatDays,
+    tatDeviationDays: row.tatDeviationDays,
+    shopOrder: row.shopOrder,
+    unscheduledCostCapUsd: row.unscheduledCostCapUsd,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    sentAt: row.sentAt?.toISOString() ?? null,
+    acceptedAt: row.acceptedAt?.toISOString() ?? null,
+    releasedAt: row.releasedAt?.toISOString() ?? null,
+  };
+}
+
+export function toShopVisitExchangeSummary(
+  row: ShopVisitExchangeRow,
+): ShopVisitExchangeSummary {
+  return {
+    id: row.id,
+    recommendationId: row.recommendationId,
+    engineId: row.engineId,
+    engineModel: row.engineModel,
+    tailNumber: row.tailNumber,
+    mroProvider: row.mroProvider,
+    status: row.status as ExchangeStatus,
+    documentId: row.documentId,
+    inductionStatus: row.acknowledgement?.inductionStatus ?? null,
+    targetTatDays: row.targetTatDays,
+    committedTatDays: row.committedTatDays,
+    tatDeviationDays: row.tatDeviationDays,
+    shopOrder: row.shopOrder,
+    unscheduledCostCapUsd: row.unscheduledCostCapUsd,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    sentAt: row.sentAt?.toISOString() ?? null,
+    acceptedAt: row.acceptedAt?.toISOString() ?? null,
+    releasedAt: row.releasedAt?.toISOString() ?? null,
   };
 }
 

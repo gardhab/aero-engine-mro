@@ -3,6 +3,7 @@ export * from "./readings";
 export * from "./rules";
 export * from "./recommendations";
 export * from "./sap-notifications";
+export * from "./shop-visit-exchanges";
 export * from "./ontology-versions";
 export * from "./backtest-runs";
 export * from "./activity";

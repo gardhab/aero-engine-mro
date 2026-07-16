@@ -21,9 +21,11 @@ import type {
 
 import type {
   ActivityEvent,
+  AdvanceExchangeInput,
   BacktestInput,
   BacktestRun,
   BadRequestResponse,
+  ConflictResponse,
   DashboardSummary,
   Engine,
   EngineHealth,
@@ -33,6 +35,7 @@ import type {
   GraphNode,
   GraphNodeUpdate,
   HealthStatus,
+  IngestAcknowledgementInput,
   ListRecommendationsParams,
   NotFoundResponse,
   Ontology,
@@ -53,7 +56,10 @@ import type {
   Rule,
   RuleUpdate,
   SapNotification,
-  SapStatus
+  SapStatus,
+  ShopVisitExchange,
+  ShopVisitExchangeSummary,
+  ValidationFailedResponse
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1076,6 +1082,452 @@ export const usePushRecommendationToSap = <TError = ErrorType<BadRequestResponse
         TContext
       > => {
       return useMutation(getPushRecommendationToSapMutationOptions(options));
+    }
+
+export const getDispatchRecommendationUrl = (id: string,) => {
+
+
+
+
+  return `/api/recommendations/${id}/dispatch`
+}
+
+/**
+ * @summary Dispatch an approved recommendation to an MRO shop as an Engine Service Request (TSR)
+ */
+export const dispatchRecommendation = async (id: string, options?: RequestInit): Promise<ShopVisitExchange> => {
+
+  return customFetch<ShopVisitExchange>(getDispatchRecommendationUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getDispatchRecommendationMutationOptions = <TError = ErrorType<BadRequestResponse | NotFoundResponse | ConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dispatchRecommendation>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof dispatchRecommendation>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['dispatchRecommendation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof dispatchRecommendation>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  dispatchRecommendation(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DispatchRecommendationMutationResult = NonNullable<Awaited<ReturnType<typeof dispatchRecommendation>>>
+
+    export type DispatchRecommendationMutationError = ErrorType<BadRequestResponse | NotFoundResponse | ConflictResponse>
+
+    /**
+ * @summary Dispatch an approved recommendation to an MRO shop as an Engine Service Request (TSR)
+ */
+export const useDispatchRecommendation = <TError = ErrorType<BadRequestResponse | NotFoundResponse | ConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dispatchRecommendation>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof dispatchRecommendation>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDispatchRecommendationMutationOptions(options));
+    }
+
+export const getGetRecommendationExchangeUrl = (id: string,) => {
+
+
+
+
+  return `/api/recommendations/${id}/exchange`
+}
+
+/**
+ * @summary Get the shop-visit exchange for a recommendation, if one exists
+ */
+export const getRecommendationExchange = async (id: string, options?: RequestInit): Promise<ShopVisitExchange> => {
+
+  return customFetch<ShopVisitExchange>(getGetRecommendationExchangeUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRecommendationExchangeQueryKey = (id: string,) => {
+    return [
+    `/api/recommendations/${id}/exchange`
+    ] as const;
+    }
+
+
+export const getGetRecommendationExchangeQueryOptions = <TData = Awaited<ReturnType<typeof getRecommendationExchange>>, TError = ErrorType<NotFoundResponse>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecommendationExchange>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRecommendationExchangeQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRecommendationExchange>>> = ({ signal }) => getRecommendationExchange(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRecommendationExchange>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRecommendationExchangeQueryResult = NonNullable<Awaited<ReturnType<typeof getRecommendationExchange>>>
+export type GetRecommendationExchangeQueryError = ErrorType<NotFoundResponse>
+
+
+/**
+ * @summary Get the shop-visit exchange for a recommendation, if one exists
+ */
+
+export function useGetRecommendationExchange<TData = Awaited<ReturnType<typeof getRecommendationExchange>>, TError = ErrorType<NotFoundResponse>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRecommendationExchange>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRecommendationExchangeQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListExchangesUrl = () => {
+
+
+
+
+  return `/api/exchanges`
+}
+
+/**
+ * @summary List shop-visit exchanges
+ */
+export const listExchanges = async ( options?: RequestInit): Promise<ShopVisitExchangeSummary[]> => {
+
+  return customFetch<ShopVisitExchangeSummary[]>(getListExchangesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListExchangesQueryKey = () => {
+    return [
+    `/api/exchanges`
+    ] as const;
+    }
+
+
+export const getListExchangesQueryOptions = <TData = Awaited<ReturnType<typeof listExchanges>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listExchanges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListExchangesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listExchanges>>> = ({ signal }) => listExchanges({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listExchanges>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListExchangesQueryResult = NonNullable<Awaited<ReturnType<typeof listExchanges>>>
+export type ListExchangesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List shop-visit exchanges
+ */
+
+export function useListExchanges<TData = Awaited<ReturnType<typeof listExchanges>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listExchanges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListExchangesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetExchangeUrl = (id: string,) => {
+
+
+
+
+  return `/api/exchanges/${id}`
+}
+
+/**
+ * @summary Get one shop-visit exchange with full TSR and acknowledgement
+ */
+export const getExchange = async (id: string, options?: RequestInit): Promise<ShopVisitExchange> => {
+
+  return customFetch<ShopVisitExchange>(getGetExchangeUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetExchangeQueryKey = (id: string,) => {
+    return [
+    `/api/exchanges/${id}`
+    ] as const;
+    }
+
+
+export const getGetExchangeQueryOptions = <TData = Awaited<ReturnType<typeof getExchange>>, TError = ErrorType<NotFoundResponse>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getExchange>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetExchangeQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getExchange>>> = ({ signal }) => getExchange(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getExchange>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetExchangeQueryResult = NonNullable<Awaited<ReturnType<typeof getExchange>>>
+export type GetExchangeQueryError = ErrorType<NotFoundResponse>
+
+
+/**
+ * @summary Get one shop-visit exchange with full TSR and acknowledgement
+ */
+
+export function useGetExchange<TData = Awaited<ReturnType<typeof getExchange>>, TError = ErrorType<NotFoundResponse>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getExchange>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetExchangeQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getIngestAcknowledgementUrl = (id: string,) => {
+
+
+
+
+  return `/api/exchanges/${id}/acknowledgement`
+}
+
+/**
+ * @summary Ingest and validate an MRO Induction Acceptance (JSON or XML)
+ */
+export const ingestAcknowledgement = async (id: string,
+    ingestAcknowledgementInput: IngestAcknowledgementInput, options?: RequestInit): Promise<ShopVisitExchange> => {
+
+  return customFetch<ShopVisitExchange>(getIngestAcknowledgementUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(ingestAcknowledgementInput)
+  }
+);}
+
+
+
+
+
+export const getIngestAcknowledgementMutationOptions = <TError = ErrorType<ValidationFailedResponse | NotFoundResponse | ConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ingestAcknowledgement>>, TError,{id: string;data: BodyType<IngestAcknowledgementInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof ingestAcknowledgement>>, TError,{id: string;data: BodyType<IngestAcknowledgementInput>}, TContext> => {
+
+const mutationKey = ['ingestAcknowledgement'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof ingestAcknowledgement>>, {id: string;data: BodyType<IngestAcknowledgementInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  ingestAcknowledgement(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type IngestAcknowledgementMutationResult = NonNullable<Awaited<ReturnType<typeof ingestAcknowledgement>>>
+    export type IngestAcknowledgementMutationBody = BodyType<IngestAcknowledgementInput>
+    export type IngestAcknowledgementMutationError = ErrorType<ValidationFailedResponse | NotFoundResponse | ConflictResponse>
+
+    /**
+ * @summary Ingest and validate an MRO Induction Acceptance (JSON or XML)
+ */
+export const useIngestAcknowledgement = <TError = ErrorType<ValidationFailedResponse | NotFoundResponse | ConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ingestAcknowledgement>>, TError,{id: string;data: BodyType<IngestAcknowledgementInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof ingestAcknowledgement>>,
+        TError,
+        {id: string;data: BodyType<IngestAcknowledgementInput>},
+        TContext
+      > => {
+      return useMutation(getIngestAcknowledgementMutationOptions(options));
+    }
+
+export const getAdvanceExchangeUrl = (id: string,) => {
+
+
+
+
+  return `/api/exchanges/${id}/advance`
+}
+
+/**
+ * @summary Advance the shop-visit exchange lifecycle to the next status
+ */
+export const advanceExchange = async (id: string,
+    advanceExchangeInput: AdvanceExchangeInput, options?: RequestInit): Promise<ShopVisitExchange> => {
+
+  return customFetch<ShopVisitExchange>(getAdvanceExchangeUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(advanceExchangeInput)
+  }
+);}
+
+
+
+
+
+export const getAdvanceExchangeMutationOptions = <TError = ErrorType<NotFoundResponse | ConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof advanceExchange>>, TError,{id: string;data: BodyType<AdvanceExchangeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof advanceExchange>>, TError,{id: string;data: BodyType<AdvanceExchangeInput>}, TContext> => {
+
+const mutationKey = ['advanceExchange'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof advanceExchange>>, {id: string;data: BodyType<AdvanceExchangeInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  advanceExchange(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdvanceExchangeMutationResult = NonNullable<Awaited<ReturnType<typeof advanceExchange>>>
+    export type AdvanceExchangeMutationBody = BodyType<AdvanceExchangeInput>
+    export type AdvanceExchangeMutationError = ErrorType<NotFoundResponse | ConflictResponse>
+
+    /**
+ * @summary Advance the shop-visit exchange lifecycle to the next status
+ */
+export const useAdvanceExchange = <TError = ErrorType<NotFoundResponse | ConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof advanceExchange>>, TError,{id: string;data: BodyType<AdvanceExchangeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof advanceExchange>>,
+        TError,
+        {id: string;data: BodyType<AdvanceExchangeInput>},
+        TContext
+      > => {
+      return useMutation(getAdvanceExchangeMutationOptions(options));
     }
 
 export const getRunPipelineUrl = () => {

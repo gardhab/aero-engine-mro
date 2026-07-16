@@ -6,16 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ActivityEventType = typeof ActivityEventType[keyof typeof ActivityEventType];
-
-
-export const ActivityEventType = {
-  recommendation: 'recommendation',
-  approval: 'approval',
-  rejection: 'rejection',
-  sap_push: 'sap_push',
-  pipeline: 'pipeline',
-  ontology: 'ontology',
-  backtest: 'backtest',
-  exchange: 'exchange',
-} as const;
+export interface FeasibilityFlag {
+  reference: string;
+  feasible: boolean;
+  /** @nullable */
+  note: string | null;
+}

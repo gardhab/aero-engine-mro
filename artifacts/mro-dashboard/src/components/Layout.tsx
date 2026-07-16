@@ -22,7 +22,8 @@ import {
   DocumentTasks,
   DataVis_1,
   CloudApp,
-  Time
+  Time,
+  Types
 } from '@carbon/icons-react';
 
 interface LayoutProps {
@@ -94,6 +95,11 @@ export function Layout({ children }: LayoutProps) {
                 <Link href="/sap" asChild>
                   <SideNavLink renderIcon={CloudApp} href="/sap" isActive={location.startsWith('/sap')}>
                     SAP Adapter
+                  </SideNavLink>
+                </Link>
+                <Link href="/exchanges" asChild>
+                  <SideNavLink renderIcon={Types} href="/exchanges" isActive={location.startsWith('/exchanges')}>
+                    Shop Visits
                   </SideNavLink>
                 </Link>
                 <Link href="/backtest" asChild>

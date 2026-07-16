@@ -53,7 +53,7 @@ export const GetDashboardSummaryResponse = zod.object({
 export const GetActivityResponseItem = zod.object({
   "id": zod.string(),
   "timestamp": zod.string(),
-  "type": zod.enum(['recommendation', 'approval', 'rejection', 'sap_push', 'pipeline', 'ontology', 'backtest']),
+  "type": zod.enum(['recommendation', 'approval', 'rejection', 'sap_push', 'pipeline', 'ontology', 'backtest', 'exchange']),
   "description": zod.string(),
   "engineId": zod.string().nullish(),
   "recommendationId": zod.string().nullish()
@@ -489,6 +489,477 @@ export const PushRecommendationToSapResponse = zod.object({
   "errorMessage": zod.string().nullish(),
   "payload": zod.record(zod.string(), zod.unknown()),
   "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Dispatch an approved recommendation to an MRO shop as an Engine Service Request (TSR)
+ */
+export const DispatchRecommendationParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DispatchRecommendationResponse = zod.object({
+  "id": zod.string(),
+  "recommendationId": zod.string(),
+  "engineId": zod.string(),
+  "engineModel": zod.string(),
+  "tailNumber": zod.string(),
+  "mroProvider": zod.string(),
+  "status": zod.enum(['recommended', 'sent', 'accepted', 'in_work', 'released', 'rejected']),
+  "documentId": zod.string(),
+  "request": zod.object({
+  "header": zod.object({
+  "documentId": zod.string(),
+  "transmissionDate": zod.string(),
+  "originator": zod.string(),
+  "recipient": zod.string(),
+  "contractType": zod.string()
+}),
+  "asset": zod.object({
+  "engineModel": zod.string(),
+  "esn": zod.string(),
+  "flightHours": zod.number(),
+  "flightCycles": zod.number()
+}),
+  "workScope": zod.object({
+  "primaryReason": zod.string(),
+  "targetTatDays": zod.number(),
+  "targetInductionDate": zod.string().nullable(),
+  "targetReleaseDate": zod.string().nullable(),
+  "directives": zod.array(zod.object({
+  "module": zod.string(),
+  "actionRequired": zod.string()
+})),
+  "complianceDirectives": zod.array(zod.object({
+  "reference": zod.string(),
+  "category": zod.string(),
+  "description": zod.string()
+})),
+  "materialPolicy": zod.union([zod.object({
+  "partsSupply": zod.string(),
+  "materialClass": zod.string(),
+  "scrapPolicy": zod.string().nullable()
+}),zod.null()])
+})
+}),
+  "requestXml": zod.string(),
+  "acknowledgement": zod.union([zod.object({
+  "documentId": zod.string(),
+  "associatedRequestId": zod.string(),
+  "issueDate": zod.string(),
+  "inductionStatus": zod.enum(['accepted', 'rejected']),
+  "logistics": zod.object({
+  "shopOrder": zod.string().nullable(),
+  "bayAllocation": zod.string().nullable(),
+  "uncratingDate": zod.string().nullable()
+}),
+  "targetTatDays": zod.number(),
+  "committedTatDays": zod.number(),
+  "committedReleaseDate": zod.string().nullable(),
+  "feasibility": zod.array(zod.object({
+  "reference": zod.string(),
+  "feasible": zod.boolean(),
+  "note": zod.string().nullable()
+})),
+  "unscheduledCostCapUsd": zod.number().nullable(),
+  "signature": zod.string().nullable(),
+  "signedAt": zod.string().nullable()
+}),zod.null()]),
+  "targetTatDays": zod.number(),
+  "committedTatDays": zod.number().nullable(),
+  "tatDeviationDays": zod.number().nullable(),
+  "shopOrder": zod.string().nullable(),
+  "unscheduledCostCapUsd": zod.number().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "sentAt": zod.string().nullable(),
+  "acceptedAt": zod.string().nullable(),
+  "releasedAt": zod.string().nullable()
+})
+
+
+/**
+ * @summary Get the shop-visit exchange for a recommendation, if one exists
+ */
+export const GetRecommendationExchangeParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetRecommendationExchangeResponse = zod.object({
+  "id": zod.string(),
+  "recommendationId": zod.string(),
+  "engineId": zod.string(),
+  "engineModel": zod.string(),
+  "tailNumber": zod.string(),
+  "mroProvider": zod.string(),
+  "status": zod.enum(['recommended', 'sent', 'accepted', 'in_work', 'released', 'rejected']),
+  "documentId": zod.string(),
+  "request": zod.object({
+  "header": zod.object({
+  "documentId": zod.string(),
+  "transmissionDate": zod.string(),
+  "originator": zod.string(),
+  "recipient": zod.string(),
+  "contractType": zod.string()
+}),
+  "asset": zod.object({
+  "engineModel": zod.string(),
+  "esn": zod.string(),
+  "flightHours": zod.number(),
+  "flightCycles": zod.number()
+}),
+  "workScope": zod.object({
+  "primaryReason": zod.string(),
+  "targetTatDays": zod.number(),
+  "targetInductionDate": zod.string().nullable(),
+  "targetReleaseDate": zod.string().nullable(),
+  "directives": zod.array(zod.object({
+  "module": zod.string(),
+  "actionRequired": zod.string()
+})),
+  "complianceDirectives": zod.array(zod.object({
+  "reference": zod.string(),
+  "category": zod.string(),
+  "description": zod.string()
+})),
+  "materialPolicy": zod.union([zod.object({
+  "partsSupply": zod.string(),
+  "materialClass": zod.string(),
+  "scrapPolicy": zod.string().nullable()
+}),zod.null()])
+})
+}),
+  "requestXml": zod.string(),
+  "acknowledgement": zod.union([zod.object({
+  "documentId": zod.string(),
+  "associatedRequestId": zod.string(),
+  "issueDate": zod.string(),
+  "inductionStatus": zod.enum(['accepted', 'rejected']),
+  "logistics": zod.object({
+  "shopOrder": zod.string().nullable(),
+  "bayAllocation": zod.string().nullable(),
+  "uncratingDate": zod.string().nullable()
+}),
+  "targetTatDays": zod.number(),
+  "committedTatDays": zod.number(),
+  "committedReleaseDate": zod.string().nullable(),
+  "feasibility": zod.array(zod.object({
+  "reference": zod.string(),
+  "feasible": zod.boolean(),
+  "note": zod.string().nullable()
+})),
+  "unscheduledCostCapUsd": zod.number().nullable(),
+  "signature": zod.string().nullable(),
+  "signedAt": zod.string().nullable()
+}),zod.null()]),
+  "targetTatDays": zod.number(),
+  "committedTatDays": zod.number().nullable(),
+  "tatDeviationDays": zod.number().nullable(),
+  "shopOrder": zod.string().nullable(),
+  "unscheduledCostCapUsd": zod.number().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "sentAt": zod.string().nullable(),
+  "acceptedAt": zod.string().nullable(),
+  "releasedAt": zod.string().nullable()
+})
+
+
+/**
+ * @summary List shop-visit exchanges
+ */
+export const ListExchangesResponseItem = zod.object({
+  "id": zod.string(),
+  "recommendationId": zod.string(),
+  "engineId": zod.string(),
+  "engineModel": zod.string(),
+  "tailNumber": zod.string(),
+  "mroProvider": zod.string(),
+  "status": zod.enum(['recommended', 'sent', 'accepted', 'in_work', 'released', 'rejected']),
+  "documentId": zod.string(),
+  "inductionStatus": zod.union([zod.enum(['accepted', 'rejected']),zod.null()]),
+  "targetTatDays": zod.number(),
+  "committedTatDays": zod.number().nullable(),
+  "tatDeviationDays": zod.number().nullable(),
+  "shopOrder": zod.string().nullable(),
+  "unscheduledCostCapUsd": zod.number().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "sentAt": zod.string().nullable(),
+  "acceptedAt": zod.string().nullable(),
+  "releasedAt": zod.string().nullable()
+})
+export const ListExchangesResponse = zod.array(ListExchangesResponseItem)
+
+
+/**
+ * @summary Get one shop-visit exchange with full TSR and acknowledgement
+ */
+export const GetExchangeParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetExchangeResponse = zod.object({
+  "id": zod.string(),
+  "recommendationId": zod.string(),
+  "engineId": zod.string(),
+  "engineModel": zod.string(),
+  "tailNumber": zod.string(),
+  "mroProvider": zod.string(),
+  "status": zod.enum(['recommended', 'sent', 'accepted', 'in_work', 'released', 'rejected']),
+  "documentId": zod.string(),
+  "request": zod.object({
+  "header": zod.object({
+  "documentId": zod.string(),
+  "transmissionDate": zod.string(),
+  "originator": zod.string(),
+  "recipient": zod.string(),
+  "contractType": zod.string()
+}),
+  "asset": zod.object({
+  "engineModel": zod.string(),
+  "esn": zod.string(),
+  "flightHours": zod.number(),
+  "flightCycles": zod.number()
+}),
+  "workScope": zod.object({
+  "primaryReason": zod.string(),
+  "targetTatDays": zod.number(),
+  "targetInductionDate": zod.string().nullable(),
+  "targetReleaseDate": zod.string().nullable(),
+  "directives": zod.array(zod.object({
+  "module": zod.string(),
+  "actionRequired": zod.string()
+})),
+  "complianceDirectives": zod.array(zod.object({
+  "reference": zod.string(),
+  "category": zod.string(),
+  "description": zod.string()
+})),
+  "materialPolicy": zod.union([zod.object({
+  "partsSupply": zod.string(),
+  "materialClass": zod.string(),
+  "scrapPolicy": zod.string().nullable()
+}),zod.null()])
+})
+}),
+  "requestXml": zod.string(),
+  "acknowledgement": zod.union([zod.object({
+  "documentId": zod.string(),
+  "associatedRequestId": zod.string(),
+  "issueDate": zod.string(),
+  "inductionStatus": zod.enum(['accepted', 'rejected']),
+  "logistics": zod.object({
+  "shopOrder": zod.string().nullable(),
+  "bayAllocation": zod.string().nullable(),
+  "uncratingDate": zod.string().nullable()
+}),
+  "targetTatDays": zod.number(),
+  "committedTatDays": zod.number(),
+  "committedReleaseDate": zod.string().nullable(),
+  "feasibility": zod.array(zod.object({
+  "reference": zod.string(),
+  "feasible": zod.boolean(),
+  "note": zod.string().nullable()
+})),
+  "unscheduledCostCapUsd": zod.number().nullable(),
+  "signature": zod.string().nullable(),
+  "signedAt": zod.string().nullable()
+}),zod.null()]),
+  "targetTatDays": zod.number(),
+  "committedTatDays": zod.number().nullable(),
+  "tatDeviationDays": zod.number().nullable(),
+  "shopOrder": zod.string().nullable(),
+  "unscheduledCostCapUsd": zod.number().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "sentAt": zod.string().nullable(),
+  "acceptedAt": zod.string().nullable(),
+  "releasedAt": zod.string().nullable()
+})
+
+
+/**
+ * @summary Ingest and validate an MRO Induction Acceptance (JSON or XML)
+ */
+export const IngestAcknowledgementParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const IngestAcknowledgementBody = zod.object({
+  "document": zod.string(),
+  "format": zod.enum(['json', 'xml', 'auto']).optional()
+})
+
+export const IngestAcknowledgementResponse = zod.object({
+  "id": zod.string(),
+  "recommendationId": zod.string(),
+  "engineId": zod.string(),
+  "engineModel": zod.string(),
+  "tailNumber": zod.string(),
+  "mroProvider": zod.string(),
+  "status": zod.enum(['recommended', 'sent', 'accepted', 'in_work', 'released', 'rejected']),
+  "documentId": zod.string(),
+  "request": zod.object({
+  "header": zod.object({
+  "documentId": zod.string(),
+  "transmissionDate": zod.string(),
+  "originator": zod.string(),
+  "recipient": zod.string(),
+  "contractType": zod.string()
+}),
+  "asset": zod.object({
+  "engineModel": zod.string(),
+  "esn": zod.string(),
+  "flightHours": zod.number(),
+  "flightCycles": zod.number()
+}),
+  "workScope": zod.object({
+  "primaryReason": zod.string(),
+  "targetTatDays": zod.number(),
+  "targetInductionDate": zod.string().nullable(),
+  "targetReleaseDate": zod.string().nullable(),
+  "directives": zod.array(zod.object({
+  "module": zod.string(),
+  "actionRequired": zod.string()
+})),
+  "complianceDirectives": zod.array(zod.object({
+  "reference": zod.string(),
+  "category": zod.string(),
+  "description": zod.string()
+})),
+  "materialPolicy": zod.union([zod.object({
+  "partsSupply": zod.string(),
+  "materialClass": zod.string(),
+  "scrapPolicy": zod.string().nullable()
+}),zod.null()])
+})
+}),
+  "requestXml": zod.string(),
+  "acknowledgement": zod.union([zod.object({
+  "documentId": zod.string(),
+  "associatedRequestId": zod.string(),
+  "issueDate": zod.string(),
+  "inductionStatus": zod.enum(['accepted', 'rejected']),
+  "logistics": zod.object({
+  "shopOrder": zod.string().nullable(),
+  "bayAllocation": zod.string().nullable(),
+  "uncratingDate": zod.string().nullable()
+}),
+  "targetTatDays": zod.number(),
+  "committedTatDays": zod.number(),
+  "committedReleaseDate": zod.string().nullable(),
+  "feasibility": zod.array(zod.object({
+  "reference": zod.string(),
+  "feasible": zod.boolean(),
+  "note": zod.string().nullable()
+})),
+  "unscheduledCostCapUsd": zod.number().nullable(),
+  "signature": zod.string().nullable(),
+  "signedAt": zod.string().nullable()
+}),zod.null()]),
+  "targetTatDays": zod.number(),
+  "committedTatDays": zod.number().nullable(),
+  "tatDeviationDays": zod.number().nullable(),
+  "shopOrder": zod.string().nullable(),
+  "unscheduledCostCapUsd": zod.number().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "sentAt": zod.string().nullable(),
+  "acceptedAt": zod.string().nullable(),
+  "releasedAt": zod.string().nullable()
+})
+
+
+/**
+ * @summary Advance the shop-visit exchange lifecycle to the next status
+ */
+export const AdvanceExchangeParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AdvanceExchangeBody = zod.object({
+  "status": zod.enum(['recommended', 'sent', 'accepted', 'in_work', 'released', 'rejected'])
+})
+
+export const AdvanceExchangeResponse = zod.object({
+  "id": zod.string(),
+  "recommendationId": zod.string(),
+  "engineId": zod.string(),
+  "engineModel": zod.string(),
+  "tailNumber": zod.string(),
+  "mroProvider": zod.string(),
+  "status": zod.enum(['recommended', 'sent', 'accepted', 'in_work', 'released', 'rejected']),
+  "documentId": zod.string(),
+  "request": zod.object({
+  "header": zod.object({
+  "documentId": zod.string(),
+  "transmissionDate": zod.string(),
+  "originator": zod.string(),
+  "recipient": zod.string(),
+  "contractType": zod.string()
+}),
+  "asset": zod.object({
+  "engineModel": zod.string(),
+  "esn": zod.string(),
+  "flightHours": zod.number(),
+  "flightCycles": zod.number()
+}),
+  "workScope": zod.object({
+  "primaryReason": zod.string(),
+  "targetTatDays": zod.number(),
+  "targetInductionDate": zod.string().nullable(),
+  "targetReleaseDate": zod.string().nullable(),
+  "directives": zod.array(zod.object({
+  "module": zod.string(),
+  "actionRequired": zod.string()
+})),
+  "complianceDirectives": zod.array(zod.object({
+  "reference": zod.string(),
+  "category": zod.string(),
+  "description": zod.string()
+})),
+  "materialPolicy": zod.union([zod.object({
+  "partsSupply": zod.string(),
+  "materialClass": zod.string(),
+  "scrapPolicy": zod.string().nullable()
+}),zod.null()])
+})
+}),
+  "requestXml": zod.string(),
+  "acknowledgement": zod.union([zod.object({
+  "documentId": zod.string(),
+  "associatedRequestId": zod.string(),
+  "issueDate": zod.string(),
+  "inductionStatus": zod.enum(['accepted', 'rejected']),
+  "logistics": zod.object({
+  "shopOrder": zod.string().nullable(),
+  "bayAllocation": zod.string().nullable(),
+  "uncratingDate": zod.string().nullable()
+}),
+  "targetTatDays": zod.number(),
+  "committedTatDays": zod.number(),
+  "committedReleaseDate": zod.string().nullable(),
+  "feasibility": zod.array(zod.object({
+  "reference": zod.string(),
+  "feasible": zod.boolean(),
+  "note": zod.string().nullable()
+})),
+  "unscheduledCostCapUsd": zod.number().nullable(),
+  "signature": zod.string().nullable(),
+  "signedAt": zod.string().nullable()
+}),zod.null()]),
+  "targetTatDays": zod.number(),
+  "committedTatDays": zod.number().nullable(),
+  "tatDeviationDays": zod.number().nullable(),
+  "shopOrder": zod.string().nullable(),
+  "unscheduledCostCapUsd": zod.number().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "sentAt": zod.string().nullable(),
+  "acceptedAt": zod.string().nullable(),
+  "releasedAt": zod.string().nullable()
 })
 
 

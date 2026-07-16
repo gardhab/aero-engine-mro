@@ -276,7 +276,8 @@ export type ActivityType =
   | "sap_push"
   | "pipeline"
   | "ontology"
-  | "backtest";
+  | "backtest"
+  | "exchange";
 
 export interface ActivityEvent {
   id: string;

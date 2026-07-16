@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   db,
   enginesTable,
   readingsTable,
   rulesTable,
+  recommendationsTable,
+  shopVisitExchangesTable,
   ontologyVersionsTable,
 } from "@workspace/db";
 import {
@@ -20,6 +22,7 @@ import {
   type OntologyClass,
 } from "@workspace/mro-core";
 import { runPipeline, rebuildGraphReplace, rebuildGraphMerge } from "./service";
+import { dispatchExchange, ingestAcknowledgement } from "./exchange";
 import { logger } from "../logger";
 
 const SEED_CLASSES_FULL: OntologyClass[] = SEED_CLASSES.map((c) => ({
@@ -42,6 +45,9 @@ async function doSeed(): Promise<void> {
     .from(enginesTable);
   if (count > 0) {
     logger.info({ engines: count }, "Datastore already seeded");
+    // Seed the sample shop-visit exchange independently so it also appears on
+    // datastores that were seeded before the exchange feature existed.
+    await ensureExchangeSeeded();
     // Merge (not replace) so any manual graph-node corrections survive restarts.
     await rebuildGraphMerge();
     return;
@@ -123,8 +129,81 @@ async function doSeed(): Promise<void> {
   });
 
   // Run the decision pipeline to generate the initial recommendations, then
-  // build the knowledge graph from the resulting domain state.
+  // seed the sample OEM<->MRO shop-visit round-trip, then build the graph.
   await runPipeline(now);
+  await ensureExchangeSeeded();
   await rebuildGraphReplace();
   logger.info("Seeding complete");
+}
+
+/**
+ * Seed one illustrative OEM->MRO shop-visit exchange round-trip: dispatch a TSR
+ * from an approved performance-restoration recommendation and ingest the MRO's
+ * induction acceptance (committed TAT +3 days, $25k cost cap), landing it at
+ * `accepted`. Runs through the real dispatch/ingest code paths and is idempotent.
+ */
+async function ensureExchangeSeeded(): Promise<void> {
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(shopVisitExchangesTable);
+  if (count > 0) return;
+
+  const recRows = await db.select().from(recommendationsTable);
+  if (recRows.length === 0) return;
+
+  // Prefer a performance-restoration (EGT-margin) recommendation to mirror the
+  // canonical PRSV example; otherwise take the highest-severity recommendation.
+  const preferred =
+    recRows.find((r) => /egt|performance|margin|restoration/i.test(r.failureMode)) ??
+    [...recRows].sort((a, b) => b.severity - a.severity)[0];
+
+  if (!["approved", "pushed"].includes(preferred.status)) {
+    await db
+      .update(recommendationsTable)
+      .set({
+        status: "approved",
+        reviewedBy: "Fleet Engineer (seed)",
+        updatedAt: new Date(),
+      })
+      .where(eq(recommendationsTable.id, preferred.id));
+  }
+
+  const dispatch = await dispatchExchange(preferred.id);
+  if (dispatch.kind !== "dispatched") {
+    logger.warn({ kind: dispatch.kind }, "Sample exchange dispatch skipped");
+    return;
+  }
+
+  const ex = dispatch.exchange;
+  const committed = ex.targetTatDays + 3;
+  const nowIso = new Date().toISOString();
+  const ack = {
+    documentId: `${ex.mroProvider.split(" ")[0].replace(/[^A-Za-z]/g, "") || "MRO"}-ACK-${new Date().getUTCFullYear()}-07743`,
+    associatedRequestId: ex.documentId,
+    issueDate: nowIso,
+    inductionStatus: "ACCEPTED / SLOT ALLOCATED",
+    logistics: {
+      shopOrder: "SO-XWB-88432",
+      bayAllocation: "Hangar 2, Module Bay Charlie",
+      uncratingDate: null,
+    },
+    targetTatDays: ex.targetTatDays,
+    committedTatDays: committed,
+    committedReleaseDate: null,
+    feasibility: ex.request.workScope.complianceDirectives.map((c) => ({
+      reference: c.reference,
+      feasible: true,
+      note: "Confirmed feasible; capability and tooling available.",
+    })),
+    unscheduledCostCapUsd: 25000,
+    signature: "Integration Hub Automated Sign-off (MRO Operations Planning)",
+    signedAt: nowIso,
+  };
+
+  const ingest = await ingestAcknowledgement(ex.id, JSON.stringify(ack), "json");
+  if (ingest.kind !== "ingested") {
+    logger.warn({ kind: ingest.kind }, "Sample acknowledgement ingest skipped");
+  } else {
+    logger.info({ documentId: ex.documentId }, "Seeded sample shop-visit exchange");
+  }
 }
