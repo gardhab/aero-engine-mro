@@ -8,6 +8,7 @@ import {
   recommendationsTable,
   shopVisitExchangesTable,
   ontologyVersionsTable,
+  llpsTable,
 } from "@workspace/db";
 import {
   FLEET,
@@ -17,6 +18,7 @@ import {
   buildEngine,
   computeEngineHealth,
   egtMarginOf,
+  generateLlpSheet,
   generateReadings,
   serializeToTurtle,
   type OntologyClass,
@@ -45,9 +47,10 @@ async function doSeed(): Promise<void> {
     .from(enginesTable);
   if (count > 0) {
     logger.info({ engines: count }, "Datastore already seeded");
-    // Seed the sample shop-visit exchange independently so it also appears on
-    // datastores that were seeded before the exchange feature existed.
+    // Seed the sample shop-visit exchange and LLP sheets independently so they
+    // also appear on datastores seeded before those features existed.
     await ensureExchangeSeeded();
+    await ensureLlpsSeeded();
     // Merge (not replace) so any manual graph-node corrections survive restarts.
     await rebuildGraphMerge();
     return;
@@ -89,6 +92,19 @@ async function doSeed(): Promise<void> {
         egtMargin: egtMarginOf(readings),
         lastUpdated: now,
       });
+      await tx.insert(llpsTable).values(
+        generateLlpSheet(spec).map((p) => ({
+          id: `${p.engineId}:${p.partNumber}`,
+          engineId: p.engineId,
+          module: p.module,
+          partName: p.partName,
+          partNumber: p.partNumber,
+          serialNumber: p.serialNumber,
+          position: p.position,
+          lifeLimitCycles: p.lifeLimitCycles,
+          csn: p.csn,
+        })),
+      );
       for (let i = 0; i < readings.length; i += 500) {
         const chunk = readings.slice(i, i + 500).map((r) => ({
           engineId: r.engineId,
@@ -134,6 +150,43 @@ async function doSeed(): Promise<void> {
   await ensureExchangeSeeded();
   await rebuildGraphReplace();
   logger.info("Seeding complete");
+}
+
+/**
+ * Idempotently seed LLP status sheets for engines that predate the feature.
+ * Sheets are deterministic per ESN and consistent with the engine's CSN/CSO.
+ */
+async function ensureLlpsSeeded(): Promise<void> {
+  // Per-engine idempotent: repair environments where only some engines have
+  // LLP rows (e.g. an engine added after a partial seed).
+  const seeded = new Set(
+    (
+      await db
+        .selectDistinct({ engineId: llpsTable.engineId })
+        .from(llpsTable)
+    ).map((r) => r.engineId),
+  );
+  const engineRows = (await db.select().from(enginesTable)).filter(
+    (e) => !seeded.has(e.esn),
+  );
+  if (engineRows.length === 0) return;
+  for (const eng of engineRows) {
+    const sheet = generateLlpSheet({ esn: eng.esn, csn: eng.csn, cso: eng.cso });
+    await db.insert(llpsTable).values(
+      sheet.map((p) => ({
+        id: `${p.engineId}:${p.partNumber}`,
+        engineId: p.engineId,
+        module: p.module,
+        partName: p.partName,
+        partNumber: p.partNumber,
+        serialNumber: p.serialNumber,
+        position: p.position,
+        lifeLimitCycles: p.lifeLimitCycles,
+        csn: p.csn,
+      })),
+    );
+  }
+  logger.info({ engines: engineRows.length }, "Seeded LLP status sheets");
 }
 
 /**

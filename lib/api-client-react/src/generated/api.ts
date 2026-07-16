@@ -29,6 +29,8 @@ import type {
   DashboardSummary,
   Engine,
   EngineHealth,
+  EngineLlpSheet,
+  FleetLlpSummaryItem,
   GetEngineReadingsParams,
   GetGraphParams,
   GraphData,
@@ -540,6 +542,160 @@ export function useGetEngineHealth<TData = Awaited<ReturnType<typeof getEngineHe
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetEngineHealthQueryOptions(esn,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetEngineLlpsUrl = (esn: string,) => {
+
+
+
+
+  return `/api/engines/${esn}/llps`
+}
+
+/**
+ * @summary Get the engine's life-limited part (LLP) status sheet
+ */
+export const getEngineLlps = async (esn: string, options?: RequestInit): Promise<EngineLlpSheet> => {
+
+  return customFetch<EngineLlpSheet>(getGetEngineLlpsUrl(esn),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEngineLlpsQueryKey = (esn: string,) => {
+    return [
+    `/api/engines/${esn}/llps`
+    ] as const;
+    }
+
+
+export const getGetEngineLlpsQueryOptions = <TData = Awaited<ReturnType<typeof getEngineLlps>>, TError = ErrorType<NotFoundResponse>>(esn: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEngineLlps>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEngineLlpsQueryKey(esn);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEngineLlps>>> = ({ signal }) => getEngineLlps(esn, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: esn !== null && esn !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEngineLlps>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEngineLlpsQueryResult = NonNullable<Awaited<ReturnType<typeof getEngineLlps>>>
+export type GetEngineLlpsQueryError = ErrorType<NotFoundResponse>
+
+
+/**
+ * @summary Get the engine's life-limited part (LLP) status sheet
+ */
+
+export function useGetEngineLlps<TData = Awaited<ReturnType<typeof getEngineLlps>>, TError = ErrorType<NotFoundResponse>>(
+ esn: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEngineLlps>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEngineLlpsQueryOptions(esn,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetFleetLlpSummaryUrl = () => {
+
+
+
+
+  return `/api/llps/summary`
+}
+
+/**
+ * @summary Fleet-level LLP summary (limiting part per engine)
+ */
+export const getFleetLlpSummary = async ( options?: RequestInit): Promise<FleetLlpSummaryItem[]> => {
+
+  return customFetch<FleetLlpSummaryItem[]>(getGetFleetLlpSummaryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFleetLlpSummaryQueryKey = () => {
+    return [
+    `/api/llps/summary`
+    ] as const;
+    }
+
+
+export const getGetFleetLlpSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getFleetLlpSummary>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFleetLlpSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFleetLlpSummaryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFleetLlpSummary>>> = ({ signal }) => getFleetLlpSummary({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFleetLlpSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFleetLlpSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getFleetLlpSummary>>>
+export type GetFleetLlpSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Fleet-level LLP summary (limiting part per engine)
+ */
+
+export function useGetFleetLlpSummary<TData = Awaited<ReturnType<typeof getFleetLlpSummary>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFleetLlpSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFleetLlpSummaryQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

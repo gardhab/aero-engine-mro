@@ -187,6 +187,61 @@ export interface LifeLimitedPart {
   cyclesRemaining?: number | null;
 }
 
+export type LlpLifeStatus = typeof LlpLifeStatus[keyof typeof LlpLifeStatus];
+
+
+export const LlpLifeStatus = {
+  ok: 'ok',
+  warning: 'warning',
+  critical: 'critical',
+} as const;
+
+export interface EngineLlp {
+  engineId: string;
+  module: string;
+  partName: string;
+  partNumber: string;
+  serialNumber: string;
+  position: string;
+  /** Certified cyclic life limit (illustrative) */
+  lifeLimitCycles: number;
+  /** Part cycles since new */
+  csn: number;
+  remainingCycles: number;
+  status: LlpLifeStatus;
+}
+
+export interface LlpModuleRollup {
+  module: string;
+  partCount: number;
+  limitingPartName: string;
+  limitingSerialNumber: string;
+  minRemainingCycles: number;
+  status: LlpLifeStatus;
+}
+
+export interface EngineLlpSheet {
+  esn: string;
+  model: string;
+  tailNumber: string;
+  /** Engine (fleet) cycles since new */
+  engineCsn: number;
+  warningThresholdCycles: number;
+  criticalThresholdCycles: number;
+  parts: EngineLlp[];
+  moduleRollup: LlpModuleRollup[];
+}
+
+export interface FleetLlpSummaryItem {
+  esn: string;
+  model: string;
+  tailNumber: string;
+  partCount: number;
+  warningCount: number;
+  criticalCount: number;
+  limitingPart?: EngineLlp;
+}
+
 export interface Recommendation {
   id: string;
   engineId: string;

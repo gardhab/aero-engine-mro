@@ -137,6 +137,69 @@ export const GetEngineHealthResponse = zod.object({
 
 
 /**
+ * @summary Get the engine's life-limited part (LLP) status sheet
+ */
+export const GetEngineLlpsParams = zod.object({
+  "esn": zod.coerce.string()
+})
+
+export const GetEngineLlpsResponse = zod.object({
+  "esn": zod.string(),
+  "model": zod.string(),
+  "tailNumber": zod.string(),
+  "engineCsn": zod.number().describe('Engine (fleet) cycles since new'),
+  "warningThresholdCycles": zod.number(),
+  "criticalThresholdCycles": zod.number(),
+  "parts": zod.array(zod.object({
+  "engineId": zod.string(),
+  "module": zod.string(),
+  "partName": zod.string(),
+  "partNumber": zod.string(),
+  "serialNumber": zod.string(),
+  "position": zod.string(),
+  "lifeLimitCycles": zod.number().describe('Certified cyclic life limit (illustrative)'),
+  "csn": zod.number().describe('Part cycles since new'),
+  "remainingCycles": zod.number(),
+  "status": zod.enum(['ok', 'warning', 'critical'])
+})),
+  "moduleRollup": zod.array(zod.object({
+  "module": zod.string(),
+  "partCount": zod.number(),
+  "limitingPartName": zod.string(),
+  "limitingSerialNumber": zod.string(),
+  "minRemainingCycles": zod.number(),
+  "status": zod.enum(['ok', 'warning', 'critical'])
+}))
+})
+
+
+/**
+ * @summary Fleet-level LLP summary (limiting part per engine)
+ */
+export const GetFleetLlpSummaryResponseItem = zod.object({
+  "esn": zod.string(),
+  "model": zod.string(),
+  "tailNumber": zod.string(),
+  "partCount": zod.number(),
+  "warningCount": zod.number(),
+  "criticalCount": zod.number(),
+  "limitingPart": zod.object({
+  "engineId": zod.string(),
+  "module": zod.string(),
+  "partName": zod.string(),
+  "partNumber": zod.string(),
+  "serialNumber": zod.string(),
+  "position": zod.string(),
+  "lifeLimitCycles": zod.number().describe('Certified cyclic life limit (illustrative)'),
+  "csn": zod.number().describe('Part cycles since new'),
+  "remainingCycles": zod.number(),
+  "status": zod.enum(['ok', 'warning', 'critical'])
+}).optional()
+})
+export const GetFleetLlpSummaryResponse = zod.array(GetFleetLlpSummaryResponseItem)
+
+
+/**
  * @summary Get engine sensor readings (time series)
  */
 export const GetEngineReadingsQueryParams = zod.object({

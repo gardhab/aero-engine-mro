@@ -123,6 +123,38 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /engines/{esn}/llps:
+    get:
+      operationId: getEngineLlps
+      tags: [engines]
+      summary: Get the engine's life-limited part (LLP) status sheet
+      parameters:
+        - $ref: "#/components/parameters/EsnParam"
+      responses:
+        "200":
+          description: LLP status sheet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EngineLlpSheet"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /llps/summary:
+    get:
+      operationId: getFleetLlpSummary
+      tags: [engines]
+      summary: Fleet-level LLP summary (limiting part per engine)
+      responses:
+        "200":
+          description: Fleet LLP summary
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FleetLlpSummaryItem"
+
   /readings:
     get:
       operationId: getEngineReadings
@@ -970,6 +1002,92 @@ components:
         partNumber: { type: string }
         description: { type: string }
         cyclesRemaining: { type: ["integer", "null"] }
+
+    LlpLifeStatus:
+      type: string
+      enum: [ok, warning, critical]
+
+    EngineLlp:
+      type: object
+      required:
+        - engineId
+        - module
+        - partName
+        - partNumber
+        - serialNumber
+        - position
+        - lifeLimitCycles
+        - csn
+        - remainingCycles
+        - status
+      properties:
+        engineId: { type: string }
+        module: { type: string }
+        partName: { type: string }
+        partNumber: { type: string }
+        serialNumber: { type: string }
+        position: { type: string }
+        lifeLimitCycles: { type: integer, description: "Certified cyclic life limit (illustrative)" }
+        csn: { type: integer, description: "Part cycles since new" }
+        remainingCycles: { type: integer }
+        status: { $ref: "#/components/schemas/LlpLifeStatus" }
+
+    LlpModuleRollup:
+      type: object
+      required:
+        - module
+        - partCount
+        - limitingPartName
+        - limitingSerialNumber
+        - minRemainingCycles
+        - status
+      properties:
+        module: { type: string }
+        partCount: { type: integer }
+        limitingPartName: { type: string }
+        limitingSerialNumber: { type: string }
+        minRemainingCycles: { type: integer }
+        status: { $ref: "#/components/schemas/LlpLifeStatus" }
+
+    EngineLlpSheet:
+      type: object
+      required:
+        - esn
+        - model
+        - tailNumber
+        - engineCsn
+        - warningThresholdCycles
+        - criticalThresholdCycles
+        - parts
+        - moduleRollup
+      properties:
+        esn: { type: string }
+        model: { type: string }
+        tailNumber: { type: string }
+        engineCsn: { type: integer, description: "Engine (fleet) cycles since new" }
+        warningThresholdCycles: { type: integer }
+        criticalThresholdCycles: { type: integer }
+        parts:
+          type: array
+          items:
+            $ref: "#/components/schemas/EngineLlp"
+        moduleRollup:
+          type: array
+          items:
+            $ref: "#/components/schemas/LlpModuleRollup"
+
+    FleetLlpSummaryItem:
+      type: object
+      required: [esn, model, tailNumber, partCount, warningCount, criticalCount]
+      properties:
+        esn: { type: string }
+        model: { type: string }
+        tailNumber: { type: string }
+        partCount: { type: integer }
+        warningCount: { type: integer }
+        criticalCount: { type: integer }
+        limitingPart:
+          $ref: "#/components/schemas/EngineLlp"
 
     Recommendation:
       type: object

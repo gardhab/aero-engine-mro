@@ -15,6 +15,12 @@ export interface DecisionContext {
   now: Date;
   /** Stable id for the recommendation. */
   id: string;
+  /**
+   * Real LLP status for the parts gating this workscope (least remaining life
+   * in the affected modules). When provided, replaces the static task-library
+   * placeholder parts.
+   */
+  llps?: LifeLimitedPart[];
 }
 
 // Task templates keyed by rule id. In a production system these would be
@@ -208,7 +214,7 @@ export function buildRecommendation(ctx: DecisionContext): Recommendation {
     turnaroundDays: days,
     workscopeLevel: lib.workscope,
     affectedModules,
-    lifeLimitedParts: lib.llps,
+    lifeLimitedParts: ctx.llps && ctx.llps.length > 0 ? ctx.llps : lib.llps,
     evidence,
     regulatoryRefs: rule.regulatoryRefs,
     ruleId: rule.id,

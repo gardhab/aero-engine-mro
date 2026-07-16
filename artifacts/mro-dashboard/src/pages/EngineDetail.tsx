@@ -4,9 +4,11 @@ import {
   useGetEngine, 
   useGetEngineHealth, 
   useGetEngineReadings,
+  useGetEngineLlps,
   useListRecommendations,
   getGetEngineQueryKey,
-  getGetEngineHealthQueryKey
+  getGetEngineHealthQueryKey,
+  getGetEngineLlpsQueryKey
 } from '@workspace/api-client-react';
 import {
   Breadcrumb,
@@ -24,7 +26,15 @@ import {
   StructuredListCell,
   StructuredListBody,
   Dropdown,
-  SkeletonPlaceholder
+  SkeletonPlaceholder,
+  DataTable,
+  Table,
+  TableHead,
+  TableRow,
+  TableHeader,
+  TableBody,
+  TableCell,
+  TableContainer
 } from '@carbon/react';
 import { LineChart } from '@carbon/charts-react';
 import { Link } from 'wouter';
@@ -36,6 +46,7 @@ export default function EngineDetail() {
   const { data: engine, isLoading: isEngineLoading } = useGetEngine(esn, { query: { enabled: !!esn, queryKey: getGetEngineQueryKey(esn) } });
   const { data: health, isLoading: isHealthLoading } = useGetEngineHealth(esn, { query: { enabled: !!esn, queryKey: getGetEngineHealthQueryKey(esn) } });
   const { data: recs, isLoading: isRecsLoading } = useListRecommendations({ engineId: esn });
+  const { data: llpSheet, isLoading: isLlpLoading } = useGetEngineLlps(esn, { query: { enabled: !!esn, queryKey: getGetEngineLlpsQueryKey(esn) } });
 
   const parameters = health?.parameters.map(p => p.parameter) || [];
   const [selectedParam, setSelectedParam] = useState<string>('');
@@ -103,6 +114,7 @@ export default function EngineDetail() {
           <Tab>Overview & Health</Tab>
           <Tab>Parameter Trends</Tab>
           <Tab>Open Recommendations ({engine.openRecommendations})</Tab>
+          <Tab>LLP Status{llpSheet ? ` (${llpSheet.parts.filter(p => p.status !== 'ok').length} flagged)` : ''}</Tab>
         </TabList>
         <TabPanels>
           <TabPanel>
@@ -223,6 +235,104 @@ export default function EngineDetail() {
                   ))}
                 </StructuredListBody>
               </StructuredListWrapper>
+            </div>
+          </TabPanel>
+
+          <TabPanel>
+            <div className="mt-4">
+              {isLlpLoading || !llpSheet ? (
+                <SkeletonPlaceholder style={{ width: '100%', height: '300px' }} />
+              ) : (
+                <>
+                  <div className="dashboard-grid mb-4">
+                    {llpSheet.moduleRollup.map(m => (
+                      <div className="dashboard-col-4" key={m.module}>
+                        <Tile>
+                          <div className="card-title">{m.module}</div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Tag type={m.status === 'critical' ? 'red' : m.status === 'warning' ? 'magenta' : 'green'}>
+                              {m.minRemainingCycles.toLocaleString()} cyc
+                            </Tag>
+                            <span>{m.limitingPartName} · {m.limitingSerialNumber}</span>
+                          </div>
+                          <p className="mt-1" style={{ fontSize: '0.75rem' }}>{m.partCount} tracked parts</p>
+                        </Tile>
+                      </div>
+                    ))}
+                  </div>
+                  <DataTable
+                    rows={llpSheet.parts.map(p => ({
+                      id: `${p.engineId}:${p.partNumber}`,
+                      module: p.module,
+                      partName: p.partName,
+                      partNumber: p.partNumber,
+                      serialNumber: p.serialNumber,
+                      position: p.position,
+                      lifeLimitCycles: p.lifeLimitCycles,
+                      csn: p.csn,
+                      remainingCycles: p.remainingCycles,
+                      status: p.status
+                    }))}
+                    headers={[
+                      { key: 'module', header: 'Module' },
+                      { key: 'partName', header: 'Part' },
+                      { key: 'partNumber', header: 'Part No.' },
+                      { key: 'serialNumber', header: 'Serial No.' },
+                      { key: 'position', header: 'Position' },
+                      { key: 'lifeLimitCycles', header: 'Life Limit (cyc)' },
+                      { key: 'csn', header: 'Part CSN' },
+                      { key: 'remainingCycles', header: 'Remaining (cyc)' },
+                      { key: 'status', header: 'Status' }
+                    ]}
+                    isSortable
+                  >
+                    {({ rows, headers, getTableProps, getHeaderProps, getRowProps }) => (
+                      <TableContainer
+                        title="LLP Status Sheet"
+                        description={`Engine CSN ${llpSheet.engineCsn.toLocaleString()} · warning below ${llpSheet.warningThresholdCycles.toLocaleString()} cyc remaining, critical below ${llpSheet.criticalThresholdCycles.toLocaleString()} cyc. Life limits are illustrative, not certified data.`}
+                      >
+                        <Table {...getTableProps()}>
+                          <TableHead>
+                            <TableRow>
+                              {headers.map(header => (
+                                <TableHeader {...getHeaderProps({ header })} key={header.key}>
+                                  {header.header}
+                                </TableHeader>
+                              ))}
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {rows.map(row => {
+                              const status = String(row.cells.find(c => c.info.header === 'status')?.value ?? 'ok');
+                              return (
+                                <TableRow {...getRowProps({ row })} key={row.id}>
+                                  {row.cells.map(cell => (
+                                    <TableCell key={cell.id}>
+                                      {cell.info.header === 'status' ? (
+                                        <Tag type={status === 'critical' ? 'red' : status === 'warning' ? 'magenta' : 'green'}>
+                                          {status.toUpperCase()}
+                                        </Tag>
+                                      ) : cell.info.header === 'remainingCycles' ? (
+                                        <span className={status === 'critical' ? 'status-grounded' : status === 'warning' ? 'status-action_required' : ''}>
+                                          {Number(cell.value).toLocaleString()}
+                                        </span>
+                                      ) : typeof cell.value === 'number' ? (
+                                        cell.value.toLocaleString()
+                                      ) : (
+                                        cell.value
+                                      )}
+                                    </TableCell>
+                                  ))}
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    )}
+                  </DataTable>
+                </>
+              )}
             </div>
           </TabPanel>
         </TabPanels>

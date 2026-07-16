@@ -7,6 +7,7 @@ import type {
   Rule,
 } from "../types.js";
 import type { ShopVisitExchange } from "../exchange/types.js";
+import type { EngineLlp } from "../llp.js";
 import { PARAMETERS, PARAMETER_BY_CODE } from "../data/parameters.js";
 
 export interface GraphFilter {
@@ -24,6 +25,7 @@ export function buildGraph(
   recommendations: Recommendation[],
   rules: Rule[],
   exchanges: ShopVisitExchange[] = [],
+  llps: EngineLlp[] = [],
 ): GraphData {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
@@ -95,8 +97,20 @@ export function buildGraph(
     }
   }
 
-  // Per-engine nodes: engine, its modules, and monitoredBy links.
-  const modulesUsed = Array.from(new Set(PARAMETERS.map((p) => p.module)));
+  // Per-engine nodes: engine, its modules, and monitoredBy links. Modules are
+  // the union of ECTM-monitored modules and modules carrying tracked LLPs.
+  const llpsByEngine = new Map<string, EngineLlp[]>();
+  for (const p of llps) {
+    const list = llpsByEngine.get(p.engineId) ?? [];
+    list.push(p);
+    llpsByEngine.set(p.engineId, list);
+  }
+  const modulesUsed = Array.from(
+    new Set([
+      ...PARAMETERS.map((p) => p.module),
+      ...llps.map((p) => p.module),
+    ]),
+  );
   for (const eng of engines) {
     addNode({
       id: `engine:${eng.esn}`,
@@ -134,6 +148,33 @@ export function buildGraph(
           label: "monitoredBy",
         });
       }
+    }
+
+    // Life-limited parts installed on this engine, attached to their module.
+    for (const part of llpsByEngine.get(eng.esn) ?? []) {
+      const llpId = `llp:${part.engineId}:${part.partNumber}`;
+      addNode({
+        id: llpId,
+        type: "LifeLimitedPart",
+        label: `${part.partName} · ${part.serialNumber}`,
+        properties: {
+          engineId: part.engineId,
+          partNumber: part.partNumber,
+          serialNumber: part.serialNumber,
+          module: part.module,
+          position: part.position,
+          lifeLimitCycles: part.lifeLimitCycles,
+          csn: part.csn,
+          remainingCycles: part.remainingCycles,
+          lifeStatus: part.status,
+        },
+      });
+      addEdge({
+        id: `e:${part.engineId}:${slug(part.module)}:${part.partNumber}:hasComponent`,
+        source: `module:${part.engineId}:${slug(part.module)}`,
+        target: llpId,
+        label: "hasComponent",
+      });
     }
   }
 

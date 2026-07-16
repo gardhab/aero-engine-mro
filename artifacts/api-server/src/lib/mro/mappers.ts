@@ -2,6 +2,7 @@ import type {
   ActivityRow,
   BacktestRunRow,
   EngineRow,
+  LlpRow,
   OntologyVersionRow,
   ReadingRow,
   RecommendationRow,
@@ -9,11 +10,13 @@ import type {
   SapNotificationRow,
   ShopVisitExchangeRow,
 } from "@workspace/db";
+import { llpLifeStatus } from "@workspace/mro-core";
 import type {
   ActivityEvent,
   ActivityType,
   BacktestRun,
   Engine,
+  EngineLlp,
   EngineStatus,
   ExchangeStatus,
   Ontology,
@@ -43,6 +46,22 @@ export function toEngine(row: EngineRow, openRecommendations: number): Engine {
     egtMargin: row.egtMargin,
     openRecommendations,
     lastUpdated: row.lastUpdated.toISOString(),
+  };
+}
+
+export function toEngineLlp(row: LlpRow): EngineLlp {
+  const remainingCycles = row.lifeLimitCycles - row.csn;
+  return {
+    engineId: row.engineId,
+    module: row.module,
+    partName: row.partName,
+    partNumber: row.partNumber,
+    serialNumber: row.serialNumber,
+    position: row.position,
+    lifeLimitCycles: row.lifeLimitCycles,
+    csn: row.csn,
+    remainingCycles,
+    status: llpLifeStatus(remainingCycles),
   };
 }
 

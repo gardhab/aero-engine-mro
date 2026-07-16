@@ -9,16 +9,25 @@ import {
   sapNotificationsTable,
   shopVisitExchangesTable,
   activityTable,
+  llpsTable,
 } from "@workspace/db";
 import {
+  LLP_CRITICAL_REMAINING,
+  LLP_RULE_ID,
+  LLP_WARNING_REMAINING,
+  PARAMETER_BY_CODE,
   buildGraph,
+  buildLlpRecommendation,
   buildRecommendation,
   computeEngineHealth,
   createSapAdapter,
   egtMarginOf,
   evaluateRules,
+  limitingLlp,
   nodeCountByClass,
+  relevantLlpsForModules,
   resolveSapConfig,
+  toLifeLimitedParts,
   type ActivityType,
   type OntologyClass,
   type PipelineResult,
@@ -28,6 +37,7 @@ import {
 import { getGraphStore } from "./graph";
 import {
   toEngine,
+  toEngineLlp,
   toReading,
   toRecommendation,
   toRule,
@@ -104,6 +114,11 @@ export async function runPipeline(now: Date = new Date()): Promise<PipelineResul
       .where(eq(readingsTable.engineId, engineRow.esn));
     const readings = readingRows.map(toReading);
     const engine = toEngine(engineRow, 0);
+    const llpRows = await db
+      .select()
+      .from(llpsTable)
+      .where(eq(llpsTable.engineId, engineRow.esn));
+    const llps = llpRows.map(toEngineLlp);
     const matches = evaluateRules(rules, readings);
     rulesFired += matches.length;
 
@@ -120,11 +135,16 @@ export async function runPipeline(now: Date = new Date()): Promise<PipelineResul
         );
       if (existing.length > 0) continue;
 
+      // Attach the real limiting parts in the module this workscope touches.
+      const matchModule = PARAMETER_BY_CODE[match.rule.parameter]?.module;
       const rec = buildRecommendation({
         engine,
         match,
         now,
         id: randomUUID(),
+        llps: toLifeLimitedParts(
+          relevantLlpsForModules(llps, matchModule ? [matchModule] : []),
+        ),
       });
       const autoApproved = match.rule.autoApprove && match.confidence >= 0.8;
       rec.status = autoApproved ? "approved" : "pending";
@@ -141,6 +161,76 @@ export async function runPipeline(now: Date = new Date()): Promise<PipelineResul
         `New ${rec.priority.toUpperCase()} recommendation for ${engine.esn}: ${rec.failureMode}`,
         { engineId: engine.esn, recommendationId: rec.id },
       );
+    }
+
+    // LLP remaining-life policy: if the engine's limiting part falls below the
+    // planning threshold, raise a dedicated shop-visit recommendation.
+    const limiting = limitingLlp(llps);
+    if (limiting && limiting.remainingCycles <= LLP_WARNING_REMAINING) {
+      const existing = await db
+        .select({
+          id: recommendationsTable.id,
+          priority: recommendationsTable.priority,
+          status: recommendationsTable.status,
+        })
+        .from(recommendationsTable)
+        .where(
+          and(
+            eq(recommendationsTable.engineId, engine.esn),
+            eq(recommendationsTable.ruleId, LLP_RULE_ID),
+            inArray(recommendationsTable.status, [...ACTIVE_STATUSES]),
+          ),
+        );
+      const driving = llps
+        .filter((p) => p.remainingCycles <= LLP_WARNING_REMAINING)
+        .sort((a, b) => a.remainingCycles - b.remainingCycles);
+      if (existing.length === 0) {
+        const rec = buildLlpRecommendation(engine, driving, now, randomUUID());
+        await db.insert(recommendationsTable).values({
+          ...rec,
+          createdAt: now,
+          updatedAt: now,
+        });
+        newRecommendationIds.push(rec.id);
+        await logActivity(
+          "recommendation",
+          `New ${rec.priority.toUpperCase()} recommendation for ${engine.esn}: ${rec.failureMode} (${limiting.partName} ${limiting.remainingCycles} cycles remaining)`,
+          { engineId: engine.esn, recommendationId: rec.id },
+        );
+      } else {
+        // Escalate an active, not-yet-dispatched LLP recommendation when the
+        // limiting part has worsened into the critical band since it was raised.
+        const active = existing[0];
+        const fresh = buildLlpRecommendation(engine, driving, now, active.id);
+        const escalated =
+          fresh.priority === "urgent" &&
+          active.priority !== "urgent" &&
+          (active.status === "pending" || active.status === "approved");
+        if (escalated) {
+          await db
+            .update(recommendationsTable)
+            .set({
+              priority: fresh.priority,
+              severity: fresh.severity,
+              faultDescription: fresh.faultDescription,
+              component: fresh.component,
+              tasks: fresh.tasks,
+              lifeLimitedParts: fresh.lifeLimitedParts,
+              affectedModules: fresh.affectedModules,
+              estimatedDurationHours: fresh.estimatedDurationHours,
+              turnaroundDays: fresh.turnaroundDays,
+              recommendedInductionDate: fresh.recommendedInductionDate,
+              recommendedCompletionDate: fresh.recommendedCompletionDate,
+              updatedAt: now,
+            })
+            .where(eq(recommendationsTable.id, active.id));
+          await logActivity(
+            "recommendation",
+            `Escalated recommendation for ${engine.esn} to URGENT: ${limiting.partName} now ${limiting.remainingCycles} cycles remaining (critical threshold ${LLP_CRITICAL_REMAINING})`,
+            { engineId: engine.esn, recommendationId: active.id },
+          );
+        }
+      }
     }
 
     await recomputeEngine(engine.esn);
@@ -165,30 +255,33 @@ export async function runPipeline(now: Date = new Date()): Promise<PipelineResul
 /** Rebuild the full projection and merge it (adds new nodes, keeps corrections). */
 export async function rebuildGraphMerge(): Promise<void> {
   const store = await getGraphStore();
-  const engineRows = await db.select().from(enginesTable);
-  const ruleRows = await db.select().from(rulesTable);
-  const recRows = await db.select().from(recommendationsTable);
-  const exchangeRows = await db.select().from(shopVisitExchangesTable);
-  const engines = engineRows.map((e) => toEngine(e, 0));
-  const rules = ruleRows.map(toRule);
-  const recs = recRows.map(toRecommendation);
-  const exchanges = exchangeRows.map(toShopVisitExchange);
-  const graph = buildGraph(engines, recs, rules, exchanges);
+  const graph = buildGraph(...(await loadGraphInputs()));
   await store.merge(graph);
 }
 
 /** Full graph rebuild from scratch (used on seed). */
 export async function rebuildGraphReplace(): Promise<void> {
   const store = await getGraphStore();
-  const engineRows = await db.select().from(enginesTable);
-  const ruleRows = await db.select().from(rulesTable);
-  const recRows = await db.select().from(recommendationsTable);
-  const exchangeRows = await db.select().from(shopVisitExchangesTable);
-  const engines = engineRows.map((e) => toEngine(e, 0));
-  const rules = ruleRows.map(toRule);
-  const recs = recRows.map(toRecommendation);
-  const exchanges = exchangeRows.map(toShopVisitExchange);
-  await store.replaceAll(buildGraph(engines, recs, rules, exchanges));
+  await store.replaceAll(buildGraph(...(await loadGraphInputs())));
+}
+
+/** Load and map everything the graph projection consumes, in parallel. */
+async function loadGraphInputs() {
+  const [engineRows, ruleRows, recRows, exchangeRows, llpRows] =
+    await Promise.all([
+      db.select().from(enginesTable),
+      db.select().from(rulesTable),
+      db.select().from(recommendationsTable),
+      db.select().from(shopVisitExchangesTable),
+      db.select().from(llpsTable),
+    ]);
+  return [
+    engineRows.map((e) => toEngine(e, 0)),
+    recRows.map(toRecommendation),
+    ruleRows.map(toRule),
+    exchangeRows.map(toShopVisitExchange),
+    llpRows.map(toEngineLlp),
+  ] as const;
 }
 
 export interface SapPushOutcome {
