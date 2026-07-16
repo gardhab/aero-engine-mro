@@ -1,0 +1,151 @@
+## 1. XML Schema Definition (XSD) & Sample Payload
+This XML schema (XSD) and matching payload mirror the AECMA/Spec 2000 Chapter 4 (Aircraft Maintenance Data Exchange) standard used in aviation digital threads. It handles the structural data handshake between Rolls-Royce systems (e.g., SAP/Maximo) and HAESL's MRO ERP system.
+## The XML Schema Definition (XSD)
+
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://w3.org">
+  <xs:element name="EngineServiceRequest">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="Header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="DocumentID" type="xs:string"/>
+              <xs:element name="TransmissionDate" type="xs:dateTime"/>
+              <xs:element name="Originator" type="xs:string"/>
+              <xs:element name="Recipient" type="xs:string"/>
+              <xs:element name="ContractType" type="xs:string"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="AssetDetails">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="EngineModel" type="xs:string"/>
+              <xs:element name="ESN" type="xs:string"/>
+              <xs:element name="FlightHours" type="xs:decimal"/>
+              <xs:element name="FlightCycles" type="xs:integer"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="WorkScope">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="PrimaryReason" type="xs:string"/>
+              <xs:element name="TargetTAT" type="xs:integer"/>
+              <xs:element name="Directives">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="Directive" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="Module" type="xs:string"/>
+                          <xs:element name="ActionRequired" type="xs:string"/>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
+
+## The Matching XML Data Payload Instance
+
+<?xml version="1.0" encoding="UTF-8"?>
+<EngineServiceRequest xmlns:xsi="http://w3.org">
+  <Header>
+    <DocumentID>RR-TSR-2026-XWB-9021</DocumentID>
+    <TransmissionDate>2026-07-16T09:00:00Z</TransmissionDate>
+    <Originator>Rolls-Royce plc</Originator>
+    <Recipient>HAESL</Recipient>
+    <ContractType>TotalCare</ContractType>
+  </Header>
+  <AssetDetails>
+    <EngineModel>Trent XWB-84</EngineModel>
+    <ESN>ESN-21448</ESN>
+    <FlightHours>18450.5</FlightHours>
+    <FlightCycles>3120</FlightCycles>
+  </AssetDetails>
+  <WorkScope>
+    <PrimaryReason>Performance Restoration Shop Visit (PRSV)</PrimaryReason>
+    <TargetTAT>65</TargetTAT>
+    <Directives>
+      <Directive>
+        <Module>Module 5 (HPT)</Module>
+        <ActionRequired>Full Overhaul. Replace Stage 1 and 2 blades.</ActionRequired>
+      </Directive>
+      <Directive>
+        <Module>Module 7 (LPT)</Module>
+        <ActionRequired>Borescope inspection only. Check limits.</ActionRequired>
+      </Directive>
+    </Directives>
+  </WorkScope>
+</EngineServiceRequest>
+
+------------------------------
+## 2. MRO Response Document (HAESL Order Acknowledgement)
+Once HAESL receives the XML payload and verifies the physical induction slot availability, they transmit back an Induction Acceptance & Commercial Proposal. This confirms receipt, flags constraints, and converts the TSR into an active internal MRO Shop Order.
+------------------------------
+## HAESL Engine Induction Confirmation & Work Scope Acceptance
+Document Control: HAESL-ACK-2026-07743
+Associated RR Reference: RR-TSR-2026-XWB-9021
+Date of Issue: July 17, 2026
+------------------------------
+## 1. Acceptance Status & Logistics Tracking
+
+* Induction Status: ACCEPTED / SLOT ALLOCATED
+* Allocated Internal Shop Order: SO-XWB-88432
+* Target Bay Allocation: Hangar 2, Module Bay Charlie
+* Estimated Uncrating Date: July 25, 2026
+
+------------------------------
+## 2. Technical Evaluation & Capacity Commitment
+
+| Parameter | Rolls-Royce Target | HAESL Committed | Deviation / Notes |
+|---|---|---|---|
+| Arrival Date | July 24, 2026 | July 24, 2026 | Slots cleared for customs clearance at HKG. |
+| Turnaround Time | 65 Calendar Days | 68 Calendar Days | Adjusted due to dynamic test-cell queue constraints. |
+| Target Release | Sept 27, 2026 | Sept 30, 2026 | New estimated release date. |
+
+------------------------------
+## 3. Work Scope Confirmation & Resource Matrix
+HAESL confirms execution capability for all requested directives using approved Rolls-Royce Trent XWB Engine Manual (EM) revisions.
+
+* Module 1 & 3 (Fan & IPC): Confirmed for routine visual check and cleaning.
+* Module 5 (HPT Overhaul): Confirmed. Tooling and balancing rigs allocated for Week 32.
+* Module 7 (LPT Borescope): Confirmed. If findings exceed parameters, a formal deviation report will be pushed to the RR Care Portal.
+
+------------------------------
+## 4. Service Bulletins & Technical Directives Feasibility
+
+* EASA AD 2025-0182 (HPT Micro-cracking): Feasible. Specialized NDT equipment and technicians are available.
+* RR SB 72-K992 (IPT Guide Vanes): Feasible. Materials must arrive with the engine cradle as planned.
+* RR SB 72-L104 (HPC Rotor Seals): Feasible. Standard stock item in HAESL inventory.
+
+------------------------------
+## 5. Commercial Pre-Authorization Terms
+
+* Contract Billing: Confirmed as TotalCare transaction framework. Zero baseline invoice to be processed.
+* Gate Review Thresholds: Gates 1 through 4 data packages will automatically stream to RR via API.
+* Unscheduled Cost Cap: Pre-authorized limit for immediate raw material consumption (outside of TotalCare standard kit) is set to $25,000 USD before triggering a manual approval request.
+
+------------------------------
+## 6. Authorized Digital Handshake Sign-Off
+
+HAESL acknowledges receipt of ESN-21448. We commit to performing the agreed-upon technical instructions under HKCAD Part-145 approval certificate HK.145.003.
+Electronic Signature: Integration Hub Automated Sign-off (HAESL Operations Planning)
+Timestamp: 2026-07-17T02:15:32Z
+
+------------------------------
+If you want to build upon this data exchange loop, let me know if you would like:
+
+* A JSON representation of the exact same handshake for modern RESTful Web APIs.
+* The structure of the Gate 1 Induction Discrepancy Report used when the engine arrives with unexpected damage.
+
+

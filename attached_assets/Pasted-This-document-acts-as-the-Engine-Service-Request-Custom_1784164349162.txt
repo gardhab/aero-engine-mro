@@ -1,0 +1,89 @@
+This document acts as the Engine Service Request / Customer Work Order Authorization sent from the Original Equipment Manufacturer (OEM), Rolls-Royce, to the joint-venture MRO facility, Hong Kong Aero Engine Services Limited ([HAESL](https://www.haesl.com/)).
+Because the Rolls-Royce Trent XWB engine is typically managed under a TotalCare long-term service agreement, the OEM directs the exact work scope based on real-time data tracking before the engine physically arrives at the shop.
+------------------------------
+## Rolls-Royce Technical Service Request (TSR)
+Document Control: RR-TSR-2026-XWB-9021
+Transmission Date: July 16, 2026
+Priority: Scheduled Maintenance / Fleet Campaign
+------------------------------
+## 1. Administrative & Asset Identification
+
+| Field | Details |
+|---|---|
+| Originator (Customer): | Rolls-Royce plc[](https://www.rolls-royce.com/) (Civil Aerospace) |
+| MRO Provider (Vendor): | HAESL (Hong Kong Aero Engine Services Ltd.) |
+| Contract Framework: | Rolls-Royce TotalCare Agreement |
+| Engine Model: | Trent XWB-84 (Airbus A350-900) |
+| Engine Serial Number (ESN): | ESN-21448 |
+| Engine Flight Hours (EFH): | 18,450 Hours |
+| Engine Flight Cycles (EFC): | 3,120 Cycles |
+
+------------------------------
+## 2. Logistics & Induction Schedule
+
+* 
+* Estimated Delivery Date to HAESL: July 24, 2026
+* Transportation Mode: Air Freight (Cradle Configuration)
+* Target Turnaround Time (TAT): 65 Calendar Days
+* Target Release Date: September 27, 2026 [1] 
+* 
+
+------------------------------
+## 3. Directed Scope of Work (SOW)
+Primary Reason for Visit: Performance Restoration Shop Visit (PRSV) triggered by Engine Health Monitoring (EHM) telemetry showing a steady decrease in Exhaust Gas Temperature (EGT) margin.
+## Module Level Directives
+
+* 
+* Module 1 (Fan Module): Perform standard visual inspection. Refurbish fan blade track liners.
+* Module 3 (Intermediate Pressure Compressor): Intermediate casing inspection; clean and inspect blades for erosion.
+* Module 5 (High Pressure Turbine): Full Overhaul Required. Remove and replace Stage 1 and Stage 2 HPT blades due to thermal degradation.
+* Module 7 (Low Pressure Turbine): Perform borescope inspection. If clearances meet current Engine Manual (EM) limits, do not disassemble. [2] 
+* 
+
+------------------------------
+## 4. Mandatory Technical Compliance (Airworthiness & Fleet Campaigns)
+The following Airworthiness Directives (AD) and Rolls-Royce Service Bulletins (SB) must be incorporated during this shop visit:
+
+| Reference Number | Category | Description / Action |
+|---|---|---|
+| EASA AD 2025-0182 | Mandatory | Inspect HPT disk cooling air holes for micro-cracking. |
+| RR SB 72-K992 | Fleet Campaign | Upgrade the Intermediate Pressure Turbine (IPT) stage 1 nozzle guide vanes to the modified variant. |
+| RR SB 72-L104 | Standard | Replacement of the High-Pressure Compressor (HPC) stage 5 rotor seals. |
+
+------------------------------
+## 5. Material & Parts Provisioning Policy
+
+* 
+* Parts Supply: All Life Limited Parts (LLPs) and specialized Trent XWB materials will be supplied directly from Rolls-Royce Logistics (Derby).
+* Material Class: New OEM parts are required for the HPT module. Serviceable Used Material (SUM) can be used for the LPC module only if pre-approved by the Rolls-Royce Fleet Engine Manager.
+* Scrap Materials: All life-expired or scrapped parts must be held for 14 days for Rolls-Royce metallurgical review before local disposal.
+* 
+
+------------------------------
+## 6. Commercial & Billing Instructions
+
+* 
+* Billing Type: TotalCare Covered (Non-T&M). Do not issue invoices for standard SOW items.
+* Exclusions / Out-of-Scope: Any "Foreign Object Damage" (FOD) or extraordinary operational damage found upon induction must be documented with high-resolution photography and submitted via an Unscheduled Repair Authorization (URA) form within 48 hours for billing adjudication.
+* Labor Rate Authorization: Capped under standard HAESL/Rolls-Royce service level contract agreements.
+* 
+
+------------------------------
+## 7. Digital Data Integration Requirements
+
+* 
+* Data Package: Upon completion, HAESL must upload the complete engine digital birth certificate, component tracking sheets, and test cell run log data directly into the Rolls-Royce Care Portal.
+* Certification: Release required via EASA Form 1 and HKCAD Form 1 dual-release airworthiness tags.
+* 
+
+------------------------------
+To tailor this to your software application, data architecture, or training module, let me know:
+
+* 
+* Do you need the JSON / XML payload schema that system-to-system interfaces use to transmit this information?
+* Would you like an example of the MRO response document (HAESL's quote/induction acceptance) that goes back to Rolls-Royce?
+* 
+
+
+[1] [https://www.avbuyer.com](https://www.avbuyer.com/articles/business-aviation-engines/three-surprises-to-anticipate-ahead-of-a-jet-engine-overhaul-114015)
+[2] [https://www.instagram.com](https://www.instagram.com/reel/Dak6jUJuvaj/)
