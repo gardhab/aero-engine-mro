@@ -36,6 +36,13 @@ body {
   background-color: var(--cds-background);
 }
 
+/* Offset content for the persistent side-nav rail (48px wide, always visible).
+   When expanded, the nav overlays the content instead of pushing it. */
+.app-content {
+  margin-left: 3rem; /* 48px rail width */
+  width: calc(100% - 3rem);
+}
+
 .page-container {
   padding: 2rem;
   max-width: 1600px;

@@ -43,6 +43,7 @@ export function Layout({ children }: LayoutProps) {
               aria-label="Open menu"
               onClick={onClickSideNavExpand}
               isActive={isSideNavExpanded}
+              isCollapsible
             />
             <Link href="/" asChild>
               <HeaderName href="/" prefix="AeroEngine">
@@ -60,7 +61,12 @@ export function Layout({ children }: LayoutProps) {
               </HeaderGlobalAction>
             </HeaderGlobalBar>
 
-            <SideNav aria-label="Side navigation" expanded={isSideNavExpanded} isPersistent={false}>
+            <SideNav
+              aria-label="Side navigation"
+              isRail
+              expanded={isSideNavExpanded}
+              onOverlayClick={onClickSideNavExpand}
+            >
               <SideNavItems>
                 <Link href="/" asChild>
                   <SideNavLink renderIcon={Dashboard} href="/" isActive={location === '/'}>
