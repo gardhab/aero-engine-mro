@@ -103,6 +103,11 @@ export function Layout({ children }: LayoutProps) {
                     SAP Adapter
                   </SideNavLink>
                 </Link>
+                <Link href="/production" asChild>
+                  <SideNavLink renderIcon={Time} href="/production" isActive={location.startsWith('/production')}>
+                    Production Control
+                  </SideNavLink>
+                </Link>
                 <Link href="/exchanges" asChild>
                   <SideNavLink renderIcon={Types} href="/exchanges" isActive={location.startsWith('/exchanges')}>
                     Shop Visits

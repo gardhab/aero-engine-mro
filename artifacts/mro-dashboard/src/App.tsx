@@ -7,6 +7,7 @@ import EngineDetail from './pages/EngineDetail';
 import RecommendationList from './pages/RecommendationList';
 import RecommendationDetail from './pages/RecommendationDetail';
 import RuleList from './pages/RuleList';
+import ProductionControlPage from './pages/ProductionControl';
 import OntologyEditor from './pages/OntologyEditor';
 import GraphExplorer from './pages/GraphExplorer';
 import SapStatus from './pages/SapStatus';
@@ -40,6 +41,7 @@ function Router() {
         <Route path="/engines/:esn" component={EngineDetail} />
         <Route path="/recommendations" component={RecommendationList} />
         <Route path="/recommendations/:id" component={RecommendationDetail} />
+        <Route path="/production" component={ProductionControlPage} />
         <Route path="/rules" component={RuleList} />
         <Route path="/ontology" component={OntologyEditor} />
         <Route path="/graph" component={GraphExplorer} />

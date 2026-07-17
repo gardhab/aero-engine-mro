@@ -485,6 +485,19 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /production-control:
+    get:
+      operationId: getProductionControl
+      tags: [work-packages]
+      summary: TAT & production-control view computed from TCN work-package data
+      responses:
+        "200":
+          description: KPI set, engine flow board and bottleneck TCNs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductionControl"
+
   /pipeline/run:
     post:
       operationId: runPipeline
@@ -1807,6 +1820,83 @@ components:
           $ref: "#/components/schemas/WorkPackageTaskStatus"
         updatedBy:
           type: string
+
+    TatKpis:
+      type: object
+      required: [wipCount]
+      properties:
+        avgTatDays: { type: ["number", "null"] }
+        queueTimePctOfTat: { type: ["number", "null"] }
+        scheduleAdherencePct: { type: ["number", "null"] }
+        partsAvailabilityPct: { type: ["number", "null"] }
+        wipCount: { type: integer }
+        onTimeDeliveryPct: { type: ["number", "null"] }
+
+    EngineFlowRow:
+      type: object
+      required:
+        [
+          engineId,
+          workPackageId,
+          recommendationId,
+          failureMode,
+          timeInOperationHours,
+          queueTimeHours,
+          valueAddedHours,
+          elapsedDays,
+          criticalPathTcns,
+          complete,
+        ]
+      properties:
+        engineId: { type: string }
+        workPackageId: { type: string }
+        recommendationId: { type: string }
+        failureMode: { type: string }
+        currentTcn: { type: ["string", "null"] }
+        currentOperation: { type: ["string", "null"] }
+        currentStatus: { type: ["string", "null"] }
+        timeInOperationHours: { type: number }
+        queueTimeHours: { type: number }
+        valueAddedHours: { type: number }
+        elapsedDays: { type: number }
+        predictedCompletion: { type: ["string", "null"] }
+        plannedCompletion: { type: ["string", "null"] }
+        criticalPathTcns:
+          type: array
+          items: { type: string }
+        onSchedule: { type: ["boolean", "null"] }
+        complete: { type: boolean }
+
+    BottleneckAlert:
+      type: object
+      required:
+        [tcn, engineId, workPackageId, status, description, waitHours, blockedTcns]
+      properties:
+        tcn: { type: string }
+        engineId: { type: string }
+        workPackageId: { type: string }
+        status: { type: string }
+        description: { type: string }
+        waitHours: { type: number }
+        blockedTcns:
+          type: array
+          items: { type: string }
+
+    ProductionControl:
+      type: object
+      required: [asOf, kpis, engines, bottlenecks]
+      properties:
+        asOf: { type: string }
+        kpis:
+          $ref: "#/components/schemas/TatKpis"
+        engines:
+          type: array
+          items:
+            $ref: "#/components/schemas/EngineFlowRow"
+        bottlenecks:
+          type: array
+          items:
+            $ref: "#/components/schemas/BottleneckAlert"
 
     ActivityEvent:
       type: object

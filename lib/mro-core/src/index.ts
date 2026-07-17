@@ -23,3 +23,4 @@ export * from "./exchange/tsr.js";
 export * from "./exchange/acknowledgement.js";
 export * from "./exchange/xsd.js";
 export * from "./work-package.js";
+export * from "./tat.js";

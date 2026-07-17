@@ -1,9 +1,11 @@
 import { Router, type IRouter } from "express";
 import {
+  GetProductionControlResponse,
   ListWorkPackagesResponse,
   UpdateWorkPackageTaskStatusResponse,
 } from "@workspace/api-zod";
 import {
+  getProductionControl,
   listWorkPackages,
   updateWorkPackageTaskStatus,
 } from "../lib/mro/work-packages";
@@ -20,6 +22,10 @@ router.get("/work-packages", async (req, res): Promise<void> => {
         : undefined,
   });
   res.json(ListWorkPackagesResponse.parse(packages));
+});
+
+router.get("/production-control", async (_req, res): Promise<void> => {
+  res.json(GetProductionControlResponse.parse(await getProductionControl()));
 });
 
 router.post(

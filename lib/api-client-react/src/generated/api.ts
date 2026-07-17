@@ -53,6 +53,7 @@ import type {
   OntologyVersion,
   ParameterReading,
   PipelineResult,
+  ProductionControl,
   Recommendation,
   RecommendationUpdate,
   ReviewInput,
@@ -1844,6 +1845,83 @@ export const useUpdateWorkPackageTaskStatus = <TError = ErrorType<BadRequestResp
       > => {
       return useMutation(getUpdateWorkPackageTaskStatusMutationOptions(options));
     }
+
+export const getGetProductionControlUrl = () => {
+
+
+
+
+  return `/api/production-control`
+}
+
+/**
+ * @summary TAT & production-control view computed from TCN work-package data
+ */
+export const getProductionControl = async ( options?: RequestInit): Promise<ProductionControl> => {
+
+  return customFetch<ProductionControl>(getGetProductionControlUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProductionControlQueryKey = () => {
+    return [
+    `/api/production-control`
+    ] as const;
+    }
+
+
+export const getGetProductionControlQueryOptions = <TData = Awaited<ReturnType<typeof getProductionControl>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProductionControl>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProductionControlQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProductionControl>>> = ({ signal }) => getProductionControl({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProductionControl>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProductionControlQueryResult = NonNullable<Awaited<ReturnType<typeof getProductionControl>>>
+export type GetProductionControlQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary TAT & production-control view computed from TCN work-package data
+ */
+
+export function useGetProductionControl<TData = Awaited<ReturnType<typeof getProductionControl>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProductionControl>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProductionControlQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getRunPipelineUrl = () => {
 

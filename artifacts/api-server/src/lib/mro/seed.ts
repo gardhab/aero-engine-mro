@@ -25,7 +25,10 @@ import {
 } from "@workspace/mro-core";
 import { runPipeline, rebuildGraphReplace, rebuildGraphMerge } from "./service";
 import { dispatchExchange, ingestAcknowledgement } from "./exchange";
-import { ensureWorkPackagesSeeded } from "./work-packages";
+import {
+  ensureTatHistorySeeded,
+  ensureWorkPackagesSeeded,
+} from "./work-packages";
 import { logger } from "../logger";
 
 const SEED_CLASSES_FULL: OntologyClass[] = SEED_CLASSES.map((c) => ({
@@ -55,6 +58,8 @@ async function doSeed(): Promise<void> {
     await ensureOntologySeedCurrent();
     // Work packages for recommendations approved before the TCN feature.
     await ensureWorkPackagesSeeded();
+    // Execution history so TAT/production-control metrics are meaningful.
+    await ensureTatHistorySeeded();
     // Merge (not replace) so any manual graph-node corrections survive restarts.
     await rebuildGraphMerge();
     return;
@@ -153,6 +158,7 @@ async function doSeed(): Promise<void> {
   await runPipeline(now);
   await ensureExchangeSeeded();
   await ensureWorkPackagesSeeded();
+  await ensureTatHistorySeeded();
   await rebuildGraphReplace();
   logger.info("Seeding complete");
 }

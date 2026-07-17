@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import {
+  activityTable,
   db,
   recommendationsTable,
   workPackageTasksTable,
@@ -8,6 +9,7 @@ import {
   type WorkPackageTaskRow,
 } from "@workspace/db";
 import {
+  computeProductionControl,
   formatTcn,
   rollupWorkPackageStatus,
   withBlockingFlags,
@@ -159,6 +161,134 @@ export async function ensureWorkPackagesSeeded(): Promise<void> {
   if (created > 0) {
     logger.info({ created }, "Backfilled work packages for approved recommendations");
   }
+}
+
+/**
+ * One-time seeded execution history so TAT metrics are meaningful on a fresh
+ * database: backdates package induction, completes and starts some TCNs with
+ * realistic queue gaps, and leaves one TCN parked in Awaiting Parts.
+ * Idempotent: skipped as soon as any task carries a completion timestamp or a
+ * backdated creation date.
+ */
+const TAT_HISTORY_SEED_MARKER =
+  "Seeded TCN execution history for TAT/production-control metrics.";
+
+export async function ensureTatHistorySeeded(
+  now: Date = new Date(),
+): Promise<void> {
+  // Persistent gate: the marker activity row proves seeding already ran once
+  // on this database — never re-run, regardless of what the data looks like.
+  const marker = await db
+    .select({ id: activityTable.id })
+    .from(activityTable)
+    .where(eq(activityTable.description, TAT_HISTORY_SEED_MARKER))
+    .limit(1);
+  if (marker.length > 0) return;
+
+  const rows = await db.select().from(workPackageTasksTable);
+  if (rows.length === 0) return;
+  const dayMs = 86_400_000;
+
+  const byPackage = new Map<string, WorkPackageTaskRow[]>();
+  for (const r of rows) {
+    const list = byPackage.get(r.workPackageId) ?? [];
+    list.push(r);
+    byPackage.set(r.workPackageId, list);
+  }
+
+  let i = 0;
+  for (const group of byPackage.values()) {
+    const ordered = [...group].sort((a, b) => a.sequence - b.sequence);
+    // Non-destructive: never rewrite a package that shows real progression
+    // (any status change or execution timestamp) — only untouched packages
+    // receive synthetic history.
+    const progressed = ordered.some(
+      (t) =>
+        t.status !== "not_started" ||
+        t.startedAt !== null ||
+        t.completedAt !== null ||
+        now.getTime() - t.createdAt.getTime() > 2 * dayMs,
+    );
+    if (progressed) {
+      i += 1;
+      continue;
+    }
+    // Stagger inductions: 16, 22, 28... days ago.
+    const inducted = new Date(now.getTime() - (16 + i * 6) * dayMs);
+    for (const t of ordered) {
+      await db
+        .update(workPackageTasksTable)
+        .set({ createdAt: inducted, updatedAt: inducted })
+        .where(eq(workPackageTasksTable.id, t.id));
+    }
+    const first = ordered[0];
+    const second = ordered[1];
+    if (i % 2 === 0 && first) {
+      // First TCN done after a 2-day induction queue; follow-on task started
+      // late after a 3-day hand-off queue and is now parked awaiting parts.
+      const started = new Date(inducted.getTime() + 2 * dayMs);
+      const completed = new Date(
+        started.getTime() + first.estimatedHours * 3_600_000 * 2,
+      );
+      await db
+        .update(workPackageTasksTable)
+        .set({
+          status: "complete",
+          startedAt: started,
+          completedAt: completed,
+          updatedAt: completed,
+        })
+        .where(eq(workPackageTasksTable.id, first.id));
+      if (second) {
+        const secondStart = new Date(completed.getTime() + 3 * dayMs);
+        const parked = new Date(secondStart.getTime() + 1 * dayMs);
+        await db
+          .update(workPackageTasksTable)
+          .set({
+            status: "awaiting_parts",
+            startedAt: secondStart,
+            updatedAt: parked,
+          })
+          .where(eq(workPackageTasksTable.id, second.id));
+      }
+    } else if (first) {
+      // First TCN started after a 4-day induction queue, worked its estimate,
+      // then parked in Awaiting Inspection — blocking every downstream TCN.
+      const started = new Date(inducted.getTime() + 4 * dayMs);
+      const parked = new Date(
+        started.getTime() + first.estimatedHours * 3_600_000 + 5 * dayMs,
+      );
+      await db
+        .update(workPackageTasksTable)
+        .set({
+          status: "awaiting_inspection",
+          startedAt: started,
+          updatedAt: parked,
+        })
+        .where(eq(workPackageTasksTable.id, first.id));
+    }
+    i += 1;
+  }
+  await logActivity("work_package", TAT_HISTORY_SEED_MARKER);
+  logger.info("Seeded work-package execution history for TAT metrics");
+}
+
+/** Production-control view: KPI set, engine flow board and bottleneck TCNs. */
+export async function getProductionControl(now: Date = new Date()) {
+  const packages = await listWorkPackages({});
+  const recIds = [...new Set(packages.map((p) => p.recommendationId))];
+  const recs = recIds.length
+    ? await db
+        .select({
+          id: recommendationsTable.id,
+          turnaroundDays: recommendationsTable.turnaroundDays,
+        })
+        .from(recommendationsTable)
+        .where(inArray(recommendationsTable.id, recIds))
+    : [];
+  const planned: Record<string, number> = {};
+  for (const r of recs) planned[r.id] = r.turnaroundDays;
+  return computeProductionControl(packages, planned, now);
 }
 
 export type UpdateTaskStatusResult =

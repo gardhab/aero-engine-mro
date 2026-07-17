@@ -1156,6 +1156,49 @@ export const UpdateWorkPackageTaskStatusResponse = zod.object({
 
 
 /**
+ * @summary TAT & production-control view computed from TCN work-package data
+ */
+export const GetProductionControlResponse = zod.object({
+  "asOf": zod.string(),
+  "kpis": zod.object({
+  "avgTatDays": zod.number().nullish(),
+  "queueTimePctOfTat": zod.number().nullish(),
+  "scheduleAdherencePct": zod.number().nullish(),
+  "partsAvailabilityPct": zod.number().nullish(),
+  "wipCount": zod.number(),
+  "onTimeDeliveryPct": zod.number().nullish()
+}),
+  "engines": zod.array(zod.object({
+  "engineId": zod.string(),
+  "workPackageId": zod.string(),
+  "recommendationId": zod.string(),
+  "failureMode": zod.string(),
+  "currentTcn": zod.string().nullish(),
+  "currentOperation": zod.string().nullish(),
+  "currentStatus": zod.string().nullish(),
+  "timeInOperationHours": zod.number(),
+  "queueTimeHours": zod.number(),
+  "valueAddedHours": zod.number(),
+  "elapsedDays": zod.number(),
+  "predictedCompletion": zod.string().nullish(),
+  "plannedCompletion": zod.string().nullish(),
+  "criticalPathTcns": zod.array(zod.string()),
+  "onSchedule": zod.boolean().nullish(),
+  "complete": zod.boolean()
+})),
+  "bottlenecks": zod.array(zod.object({
+  "tcn": zod.string(),
+  "engineId": zod.string(),
+  "workPackageId": zod.string(),
+  "status": zod.string(),
+  "description": zod.string(),
+  "waitHours": zod.number(),
+  "blockedTcns": zod.array(zod.string())
+}))
+})
+
+
+/**
  * @summary Run the decision pipeline over current engine data
  */
 export const RunPipelineResponse = zod.object({

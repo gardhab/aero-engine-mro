@@ -826,6 +826,62 @@ export interface UpdateWorkPackageTaskStatusInput {
   updatedBy?: string;
 }
 
+export interface TatKpis {
+  /** @nullable */
+  avgTatDays?: number | null;
+  /** @nullable */
+  queueTimePctOfTat?: number | null;
+  /** @nullable */
+  scheduleAdherencePct?: number | null;
+  /** @nullable */
+  partsAvailabilityPct?: number | null;
+  wipCount: number;
+  /** @nullable */
+  onTimeDeliveryPct?: number | null;
+}
+
+export interface EngineFlowRow {
+  engineId: string;
+  workPackageId: string;
+  recommendationId: string;
+  failureMode: string;
+  /** @nullable */
+  currentTcn?: string | null;
+  /** @nullable */
+  currentOperation?: string | null;
+  /** @nullable */
+  currentStatus?: string | null;
+  timeInOperationHours: number;
+  queueTimeHours: number;
+  valueAddedHours: number;
+  elapsedDays: number;
+  /** @nullable */
+  predictedCompletion?: string | null;
+  /** @nullable */
+  plannedCompletion?: string | null;
+  criticalPathTcns: string[];
+  /** @nullable */
+  onSchedule?: boolean | null;
+  complete: boolean;
+}
+
+export interface BottleneckAlert {
+  tcn: string;
+  engineId: string;
+  workPackageId: string;
+  status: string;
+  description: string;
+  waitHours: number;
+  blockedTcns: string[];
+}
+
+export interface ProductionControl {
+  asOf: string;
+  kpis: TatKpis;
+  engines: EngineFlowRow[];
+  bottlenecks: BottleneckAlert[];
+}
+
 export type ActivityEventType = typeof ActivityEventType[keyof typeof ActivityEventType];
 
 
