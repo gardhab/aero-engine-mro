@@ -48,6 +48,19 @@ export const SEED_CLASSES: Omit<
     ],
   },
   {
+    id: "PiecePart",
+    label: "Piece Part",
+    description:
+      "A lowest-level detail part (bolt, seal, lockplate, spacer) within a component assembly.",
+    parentClass: null,
+    deprecated: false,
+    attributes: [
+      { name: "name", type: "string", description: "Piece-part name" },
+      { name: "partNumber", type: "string", description: "Part number" },
+      { name: "quantity", type: "integer", description: "Quantity per assembly" },
+    ],
+  },
+  {
     id: "Sensor",
     label: "Sensor / Measurement",
     description:
@@ -196,6 +209,14 @@ export const SEED_RELATIONSHIPS: OntologyRelationship[] = [
     domain: "EngineModule",
     range: "Component",
     description: "A module contains serviceable components.",
+    deprecated: false,
+  },
+  {
+    id: "hasPiecePart",
+    label: "has piece part",
+    domain: "Component",
+    range: "PiecePart",
+    description: "A component assembly is built from piece parts.",
     deprecated: false,
   },
   {

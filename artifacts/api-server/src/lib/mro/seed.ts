@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import {
   db,
   enginesTable,
@@ -51,6 +51,7 @@ async function doSeed(): Promise<void> {
     // also appear on datastores seeded before those features existed.
     await ensureExchangeSeeded();
     await ensureLlpsSeeded();
+    await ensureOntologySeedCurrent();
     // Merge (not replace) so any manual graph-node corrections survive restarts.
     await rebuildGraphMerge();
     return;
@@ -150,6 +151,57 @@ async function doSeed(): Promise<void> {
   await ensureExchangeSeeded();
   await rebuildGraphReplace();
   logger.info("Seeding complete");
+}
+
+/**
+ * Idempotently backfill newly introduced seed ontology classes/relationships
+ * (e.g. PiecePart / hasPiecePart) into ontology versions that predate them.
+ * Only additive: never overwrites SME edits to existing classes.
+ */
+async function ensureOntologySeedCurrent(): Promise<void> {
+  // Only touch the working draft and the currently published version —
+  // superseded historical versions stay immutable snapshots.
+  const all = await db
+    .select()
+    .from(ontologyVersionsTable)
+    .orderBy(desc(ontologyVersionsTable.createdAt));
+  const draft = all.find((r) => r.status === "draft");
+  const published = all.find((r) => r.status === "published");
+  const rows = [draft, published].filter(
+    (r): r is NonNullable<typeof r> => r != null,
+  );
+  await db.transaction(async (tx) => {
+  for (const row of rows) {
+      const classIds = new Set(row.classes.map((c) => c.id));
+      const relIds = new Set(row.relationships.map((r) => r.id));
+      const missingClasses = SEED_CLASSES_FULL.filter(
+        (c) => !classIds.has(c.id),
+      );
+      const missingRels = SEED_RELATIONSHIPS.filter((r) => !relIds.has(r.id));
+      if (missingClasses.length === 0 && missingRels.length === 0) continue;
+      const classes = [...row.classes, ...missingClasses];
+      const relationships = [...row.relationships, ...missingRels];
+      const turtle = serializeToTurtle({
+        version: row.version,
+        status: row.status === "published" ? "published" : "draft",
+        classes,
+        relationships,
+        updatedAt: new Date().toISOString(),
+      });
+      await tx
+        .update(ontologyVersionsTable)
+        .set({ classes, relationships, turtle })
+        .where(eq(ontologyVersionsTable.version, row.version));
+      logger.info(
+        {
+          version: row.version,
+          addedClasses: missingClasses.map((c) => c.id),
+          addedRelationships: missingRels.map((r) => r.id),
+        },
+        "Backfilled seed ontology additions",
+      );
+    }
+  });
 }
 
 /**

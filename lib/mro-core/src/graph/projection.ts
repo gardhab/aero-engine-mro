@@ -9,6 +9,7 @@ import type {
 import type { ShopVisitExchange } from "../exchange/types.js";
 import type { EngineLlp } from "../llp.js";
 import { PARAMETERS, PARAMETER_BY_CODE } from "../data/parameters.js";
+import { piecePartsForComponent } from "../data/piece-parts.js";
 
 export interface GraphFilter {
   engineId?: string;
@@ -175,6 +176,30 @@ export function buildGraph(
         target: llpId,
         label: "hasComponent",
       });
+
+      // Piece parts under representative components, completing the
+      // Engine → Module → Component → Piece-Part hierarchy.
+      for (const pp of piecePartsForComponent(part.partNumber)) {
+        const ppId = `piecepart:${part.engineId}:${pp.partNumber}`;
+        addNode({
+          id: ppId,
+          type: "PiecePart",
+          label: pp.name,
+          properties: {
+            engineId: part.engineId,
+            name: pp.name,
+            partNumber: pp.partNumber,
+            quantity: pp.quantity,
+            parentPartNumber: pp.parentPartNumber,
+          },
+        });
+        addEdge({
+          id: `e:${part.engineId}:${part.partNumber}:${pp.partNumber}:hasPiecePart`,
+          source: llpId,
+          target: ppId,
+          label: "hasPiecePart",
+        });
+      }
     }
   }
 
