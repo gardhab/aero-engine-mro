@@ -54,6 +54,18 @@ export const Priority = {
   aog: 'aog',
 } as const;
 
+/**
+ * Operational bucket: red = Must Do, amber = Should Do, green = Could Do.
+ */
+export type RagBucket = typeof RagBucket[keyof typeof RagBucket];
+
+
+export const RagBucket = {
+  red: 'red',
+  amber: 'amber',
+  green: 'green',
+} as const;
+
 export interface Engine {
   esn: string;
   model: string;
@@ -251,6 +263,16 @@ export interface Recommendation {
   failureMode: string;
   faultDescription: string;
   priority: Priority;
+  /**
+     * MRO repair category: 1 Airworthiness Mandatory, 2 LLP Compliance, 3 Safety-Critical, 4 Regulatory (AD/SB), 5 Functional Restoration, 6 Reliability Improvement, 7 Cosmetic.
+     * @minimum 1
+     * @maximum 7
+     */
+  repairCategory: number;
+  repairCategoryName: string;
+  ragBucket: RagBucket;
+  /** Engine cannot be released to service until this repair is done. */
+  releaseHold: boolean;
   /** 0-1 severity score */
   severity: number;
   /** 0-1 confidence score */

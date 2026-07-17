@@ -8,6 +8,7 @@ import type {
 } from "../types.js";
 import type { RuleMatch } from "../rules/engine.js";
 import { PARAMETER_BY_CODE } from "../data/parameters.js";
+import { classifyRule } from "../repair-category.js";
 
 export interface DecisionContext {
   engine: Engine;
@@ -205,6 +206,7 @@ export function buildRecommendation(ctx: DecisionContext): Recommendation {
     failureMode: rule.failureMode,
     faultDescription,
     priority,
+    ...classifyRule(rule),
     severity: round(match.severity),
     confidence: round(match.confidence),
     status: "pending",

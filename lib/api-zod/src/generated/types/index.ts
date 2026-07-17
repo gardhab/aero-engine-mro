@@ -80,6 +80,7 @@ export * from './parameterReading';
 export * from './parameterReadingStatus';
 export * from './pipelineResult';
 export * from './priority';
+export * from './ragBucket';
 export * from './recommendation';
 export * from './recommendationStatus';
 export * from './recommendationUpdate';

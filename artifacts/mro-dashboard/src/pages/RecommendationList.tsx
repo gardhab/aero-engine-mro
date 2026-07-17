@@ -18,10 +18,15 @@ import {
   Dropdown
 } from '@carbon/react';
 import { ArrowRight } from '@carbon/icons-react';
-import type { RecommendationStatus } from '@workspace/api-client-react';
+import type { RagBucket, RecommendationStatus } from '@workspace/api-client-react';
+
+const RAG_ORDER: Record<RagBucket, number> = { red: 0, amber: 1, green: 2 };
+const RAG_LABEL: Record<RagBucket, string> = { red: 'RED · Must Do', amber: 'AMBER · Should Do', green: 'GREEN · Could Do' };
+const RAG_TAG_TYPE: Record<RagBucket, 'red' | 'magenta' | 'green'> = { red: 'red', amber: 'magenta', green: 'green' };
 
 export default function RecommendationList() {
   const [statusFilter, setStatusFilter] = useState<RecommendationStatus | 'all'>('all');
+  const [ragFilter, setRagFilter] = useState<RagBucket | 'all'>('all');
   const { data: recs = [], isLoading } = useListRecommendations(
     statusFilter === 'all' ? {} : { status: statusFilter }
   );
@@ -30,17 +35,36 @@ export default function RecommendationList() {
     { key: 'engine', header: 'Engine' },
     { key: 'component', header: 'Component' },
     { key: 'failureMode', header: 'Failure Mode' },
+    { key: 'category', header: 'Repair Category' },
+    { key: 'rag', header: 'RAG' },
     { key: 'priority', header: 'Priority' },
     { key: 'confidence', header: 'Confidence' },
     { key: 'status', header: 'Status' },
     { key: 'actions', header: '' }
   ];
 
-  const rows = recs.map(r => ({
+  // Red (Must Do) items first, then by ascending category number.
+  const visible = recs
+    .filter(r => ragFilter === 'all' || r.ragBucket === ragFilter)
+    .sort((a, b) =>
+      RAG_ORDER[a.ragBucket] - RAG_ORDER[b.ragBucket] ||
+      a.repairCategory - b.repairCategory
+    );
+
+  const rows = visible.map(r => ({
     id: r.id,
     engine: `${r.engineModel} • ${r.engineId}`,
     component: r.component,
     failureMode: r.failureMode,
+    category: (
+      <span title={r.releaseHold ? 'Engine cannot be released without this repair' : undefined}>
+        Cat {r.repairCategory} · {r.repairCategoryName}
+        {r.releaseHold ? <strong> · HOLD</strong> : null}
+      </span>
+    ),
+    rag: (
+      <Tag type={RAG_TAG_TYPE[r.ragBucket]}>{RAG_LABEL[r.ragBucket]}</Tag>
+    ),
     priority: (
       <span className={`priority-${r.priority} font-bold`}>
         {r.priority.toUpperCase()}
@@ -70,15 +94,28 @@ export default function RecommendationList() {
     <div className="page-container">
       <div className="flex justify-between items-end mb-4">
         <h1>Work Recommendations</h1>
-        <div style={{ width: '200px' }}>
-          <Dropdown
-            id="status-filter"
-            titleText="Filter by Status"
-            label="Status"
-            items={statuses}
-            selectedItem={statusFilter}
-            onChange={({ selectedItem }) => setStatusFilter(selectedItem as RecommendationStatus | 'all')}
-          />
+        <div className="flex gap-2">
+          <div style={{ width: '220px' }}>
+            <Dropdown
+              id="rag-filter"
+              titleText="Filter by RAG Bucket"
+              label="RAG bucket"
+              items={['all', 'red', 'amber', 'green']}
+              itemToString={(i) => i === 'all' ? 'all' : RAG_LABEL[i as RagBucket]}
+              selectedItem={ragFilter}
+              onChange={({ selectedItem }) => setRagFilter(selectedItem as RagBucket | 'all')}
+            />
+          </div>
+          <div style={{ width: '200px' }}>
+            <Dropdown
+              id="status-filter"
+              titleText="Filter by Status"
+              label="Status"
+              items={statuses}
+              selectedItem={statusFilter}
+              onChange={({ selectedItem }) => setStatusFilter(selectedItem as RecommendationStatus | 'all')}
+            />
+          </div>
         </div>
       </div>
 

@@ -219,6 +219,19 @@ export default function RecommendationDetail() {
       <div className="dashboard-grid mb-4">
         <div className="dashboard-col-3">
           <Tile>
+            <div className="card-title">Repair Category</div>
+            <div className="card-value">Cat {rec.repairCategory}</div>
+            <div className="mt-1">{rec.repairCategoryName}</div>
+            <div className="flex gap-2 mt-1">
+              <Tag type={rec.ragBucket === 'red' ? 'red' : rec.ragBucket === 'amber' ? 'magenta' : 'green'}>
+                {rec.ragBucket === 'red' ? 'RED · Must Do' : rec.ragBucket === 'amber' ? 'AMBER · Should Do' : 'GREEN · Could Do'}
+              </Tag>
+              {rec.releaseHold && <Tag type="high-contrast">RELEASE HOLD</Tag>}
+            </div>
+          </Tile>
+        </div>
+        <div className="dashboard-col-3">
+          <Tile>
             <div className="card-title">Priority</div>
             <div className={`card-value priority-${rec.priority}`}>{rec.priority.toUpperCase()}</div>
           </Tile>

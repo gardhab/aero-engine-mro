@@ -10,6 +10,7 @@ export * from "./rules/engine.js";
 export * from "./decision/service.js";
 export * from "./health.js";
 export * from "./llp.js";
+export * from "./repair-category.js";
 export * from "./sap/payload.js";
 export * from "./sap/client.js";
 export * from "./backtest.js";

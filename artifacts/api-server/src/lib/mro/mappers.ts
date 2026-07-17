@@ -10,7 +10,7 @@ import type {
   SapNotificationRow,
   ShopVisitExchangeRow,
 } from "@workspace/db";
-import { llpLifeStatus } from "@workspace/mro-core";
+import { classifyRule, llpLifeStatus } from "@workspace/mro-core";
 import type {
   ActivityEvent,
   ActivityType,
@@ -107,6 +107,9 @@ export function toRecommendation(row: RecommendationRow): Recommendation {
     failureMode: row.failureMode,
     faultDescription: row.faultDescription,
     priority: row.priority as Priority,
+    // Classification is a pure function of the producing rule — derived at
+    // mapping time so existing rows are "backfilled" automatically.
+    ...classifyRule({ id: row.ruleId, regulatoryRefs: row.regulatoryRefs }),
     severity: row.severity,
     confidence: row.confidence,
     status: row.status as RecommendationStatus,

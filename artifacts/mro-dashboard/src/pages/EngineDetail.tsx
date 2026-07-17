@@ -68,6 +68,10 @@ export default function EngineDetail() {
     return <div className="page-container">Engine not found.</div>;
   }
 
+  const openRecs = (recs ?? []).filter(r => r.status === 'pending' || r.status === 'approved' || r.status === 'failed');
+  const openRedItems = openRecs.filter(r => r.ragBucket === 'red');
+  const releaseBlocked = openRedItems.some(r => r.releaseHold);
+
   const chartData = readings ? readings.map(r => ({
     group: r.label || r.parameter,
     cycle: r.cycle,
@@ -106,6 +110,17 @@ export default function EngineDetail() {
           <Tag size="lg" type={engine.status === 'operational' ? 'green' : engine.status === 'monitor' ? 'blue' : engine.status === 'action_required' ? 'magenta' : 'red'}>
             {engine.status.replace('_', ' ').toUpperCase()}
           </Tag>
+          {!isRecsLoading && (
+            <Tag
+              size="lg"
+              type={releaseBlocked ? 'red' : 'green'}
+              title={releaseBlocked
+                ? `${openRedItems.length} open RED (Must Do) item(s) block release to service`
+                : 'No open Red (Must Do) items blocking release'}
+            >
+              {releaseBlocked ? `RELEASE HOLD · ${openRedItems.length} RED OPEN` : 'RELEASE READY'}
+            </Tag>
+          )}
         </div>
       </div>
 
@@ -213,20 +228,33 @@ export default function EngineDetail() {
                     <StructuredListCell head>ID</StructuredListCell>
                     <StructuredListCell head>Component</StructuredListCell>
                     <StructuredListCell head>Failure Mode</StructuredListCell>
+                    <StructuredListCell head>Category</StructuredListCell>
+                    <StructuredListCell head>RAG</StructuredListCell>
                     <StructuredListCell head>Priority</StructuredListCell>
                     <StructuredListCell head>Status</StructuredListCell>
                   </StructuredListRow>
                 </StructuredListHead>
                 <StructuredListBody>
                   {isRecsLoading ? (
-                    <StructuredListRow><StructuredListCell colSpan={5}>Loading...</StructuredListCell></StructuredListRow>
-                  ) : recs?.filter(r => r.status === 'pending' || r.status === 'approved' || r.status === 'failed').length === 0 ? (
-                    <StructuredListRow><StructuredListCell colSpan={5}>No open recommendations.</StructuredListCell></StructuredListRow>
-                  ) : recs?.filter(r => r.status === 'pending' || r.status === 'approved' || r.status === 'failed').map(r => (
+                    <StructuredListRow><StructuredListCell colSpan={7}>Loading...</StructuredListCell></StructuredListRow>
+                  ) : openRecs.length === 0 ? (
+                    <StructuredListRow><StructuredListCell colSpan={7}>No open recommendations.</StructuredListCell></StructuredListRow>
+                  ) : [...openRecs].sort((a, b) =>
+                    ({ red: 0, amber: 1, green: 2 }[a.ragBucket] - { red: 0, amber: 1, green: 2 }[b.ragBucket]) ||
+                    a.repairCategory - b.repairCategory
+                  ).map(r => (
                     <StructuredListRow key={r.id}>
                       <StructuredListCell><Link href={`/recommendations/${r.id}`}>{r.id.slice(0,8)}</Link></StructuredListCell>
                       <StructuredListCell>{r.component}</StructuredListCell>
                       <StructuredListCell>{r.failureMode}</StructuredListCell>
+                      <StructuredListCell>
+                        Cat {r.repairCategory} · {r.repairCategoryName}{r.releaseHold ? <strong> · HOLD</strong> : null}
+                      </StructuredListCell>
+                      <StructuredListCell>
+                        <Tag type={r.ragBucket === 'red' ? 'red' : r.ragBucket === 'amber' ? 'magenta' : 'green'}>
+                          {r.ragBucket.toUpperCase()}
+                        </Tag>
+                      </StructuredListCell>
                       <StructuredListCell>
                         <span className={`priority-${r.priority}`}>{r.priority.toUpperCase()}</span>
                       </StructuredListCell>

@@ -17,6 +17,8 @@ export type RecommendationStatus =
 
 export type Priority = "routine" | "expedite" | "urgent" | "aog";
 
+export type RagBucketType = "red" | "amber" | "green";
+
 export type ReadingStatus = "normal" | "caution" | "warning";
 
 export type Trend = "stable" | "rising" | "falling";
@@ -108,6 +110,13 @@ export interface Recommendation {
   failureMode: string;
   faultDescription: string;
   priority: Priority;
+  /** Repair category 1 (Airworthiness Mandatory) … 7 (Cosmetic). */
+  repairCategory: number;
+  repairCategoryName: string;
+  /** Operational bucket: red = Must Do, amber = Should Do, green = Could Do. */
+  ragBucket: RagBucketType;
+  /** True when the engine cannot be released to service without this repair. */
+  releaseHold: boolean;
   severity: number;
   confidence: number;
   status: RecommendationStatus;

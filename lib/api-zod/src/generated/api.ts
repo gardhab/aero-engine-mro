@@ -228,6 +228,10 @@ export const ListRecommendationsQueryParams = zod.object({
   "engineId": zod.coerce.string().optional()
 })
 
+export const listRecommendationsResponseRepairCategoryMax = 7;
+
+
+
 export const ListRecommendationsResponseItem = zod.object({
   "id": zod.string(),
   "engineId": zod.string(),
@@ -237,6 +241,10 @@ export const ListRecommendationsResponseItem = zod.object({
   "failureMode": zod.string(),
   "faultDescription": zod.string(),
   "priority": zod.enum(['routine', 'expedite', 'urgent', 'aog']),
+  "repairCategory": zod.number().min(1).max(listRecommendationsResponseRepairCategoryMax).describe('MRO repair category: 1 Airworthiness Mandatory, 2 LLP Compliance, 3 Safety-Critical, 4 Regulatory (AD\/SB), 5 Functional Restoration, 6 Reliability Improvement, 7 Cosmetic.'),
+  "repairCategoryName": zod.string(),
+  "ragBucket": zod.enum(['red', 'amber', 'green']).describe('Operational bucket: red = Must Do, amber = Should Do, green = Could Do.'),
+  "releaseHold": zod.boolean().describe('Engine cannot be released to service until this repair is done.'),
   "severity": zod.number().describe('0-1 severity score'),
   "confidence": zod.number().describe('0-1 confidence score'),
   "status": zod.enum(['pending', 'approved', 'rejected', 'pushed', 'failed']),
@@ -288,6 +296,10 @@ export const GetRecommendationParams = zod.object({
   "id": zod.coerce.string()
 })
 
+export const getRecommendationResponseRepairCategoryMax = 7;
+
+
+
 export const GetRecommendationResponse = zod.object({
   "id": zod.string(),
   "engineId": zod.string(),
@@ -297,6 +309,10 @@ export const GetRecommendationResponse = zod.object({
   "failureMode": zod.string(),
   "faultDescription": zod.string(),
   "priority": zod.enum(['routine', 'expedite', 'urgent', 'aog']),
+  "repairCategory": zod.number().min(1).max(getRecommendationResponseRepairCategoryMax).describe('MRO repair category: 1 Airworthiness Mandatory, 2 LLP Compliance, 3 Safety-Critical, 4 Regulatory (AD\/SB), 5 Functional Restoration, 6 Reliability Improvement, 7 Cosmetic.'),
+  "repairCategoryName": zod.string(),
+  "ragBucket": zod.enum(['red', 'amber', 'green']).describe('Operational bucket: red = Must Do, amber = Should Do, green = Could Do.'),
+  "releaseHold": zod.boolean().describe('Engine cannot be released to service until this repair is done.'),
   "severity": zod.number().describe('0-1 severity score'),
   "confidence": zod.number().describe('0-1 confidence score'),
   "status": zod.enum(['pending', 'approved', 'rejected', 'pushed', 'failed']),
@@ -356,6 +372,10 @@ export const UpdateRecommendationBody = zod.object({
   "recommendedCompletionDate": zod.string().optional()
 })
 
+export const updateRecommendationResponseRepairCategoryMax = 7;
+
+
+
 export const UpdateRecommendationResponse = zod.object({
   "id": zod.string(),
   "engineId": zod.string(),
@@ -365,6 +385,10 @@ export const UpdateRecommendationResponse = zod.object({
   "failureMode": zod.string(),
   "faultDescription": zod.string(),
   "priority": zod.enum(['routine', 'expedite', 'urgent', 'aog']),
+  "repairCategory": zod.number().min(1).max(updateRecommendationResponseRepairCategoryMax).describe('MRO repair category: 1 Airworthiness Mandatory, 2 LLP Compliance, 3 Safety-Critical, 4 Regulatory (AD\/SB), 5 Functional Restoration, 6 Reliability Improvement, 7 Cosmetic.'),
+  "repairCategoryName": zod.string(),
+  "ragBucket": zod.enum(['red', 'amber', 'green']).describe('Operational bucket: red = Must Do, amber = Should Do, green = Could Do.'),
+  "releaseHold": zod.boolean().describe('Engine cannot be released to service until this repair is done.'),
   "severity": zod.number().describe('0-1 severity score'),
   "confidence": zod.number().describe('0-1 confidence score'),
   "status": zod.enum(['pending', 'approved', 'rejected', 'pushed', 'failed']),
@@ -420,6 +444,10 @@ export const ApproveRecommendationBody = zod.object({
   "reviewedBy": zod.string().optional()
 })
 
+export const approveRecommendationResponseRepairCategoryMax = 7;
+
+
+
 export const ApproveRecommendationResponse = zod.object({
   "id": zod.string(),
   "engineId": zod.string(),
@@ -429,6 +457,10 @@ export const ApproveRecommendationResponse = zod.object({
   "failureMode": zod.string(),
   "faultDescription": zod.string(),
   "priority": zod.enum(['routine', 'expedite', 'urgent', 'aog']),
+  "repairCategory": zod.number().min(1).max(approveRecommendationResponseRepairCategoryMax).describe('MRO repair category: 1 Airworthiness Mandatory, 2 LLP Compliance, 3 Safety-Critical, 4 Regulatory (AD\/SB), 5 Functional Restoration, 6 Reliability Improvement, 7 Cosmetic.'),
+  "repairCategoryName": zod.string(),
+  "ragBucket": zod.enum(['red', 'amber', 'green']).describe('Operational bucket: red = Must Do, amber = Should Do, green = Could Do.'),
+  "releaseHold": zod.boolean().describe('Engine cannot be released to service until this repair is done.'),
   "severity": zod.number().describe('0-1 severity score'),
   "confidence": zod.number().describe('0-1 confidence score'),
   "status": zod.enum(['pending', 'approved', 'rejected', 'pushed', 'failed']),
@@ -484,6 +516,10 @@ export const RejectRecommendationBody = zod.object({
   "reviewedBy": zod.string().optional()
 })
 
+export const rejectRecommendationResponseRepairCategoryMax = 7;
+
+
+
 export const RejectRecommendationResponse = zod.object({
   "id": zod.string(),
   "engineId": zod.string(),
@@ -493,6 +529,10 @@ export const RejectRecommendationResponse = zod.object({
   "failureMode": zod.string(),
   "faultDescription": zod.string(),
   "priority": zod.enum(['routine', 'expedite', 'urgent', 'aog']),
+  "repairCategory": zod.number().min(1).max(rejectRecommendationResponseRepairCategoryMax).describe('MRO repair category: 1 Airworthiness Mandatory, 2 LLP Compliance, 3 Safety-Critical, 4 Regulatory (AD\/SB), 5 Functional Restoration, 6 Reliability Improvement, 7 Cosmetic.'),
+  "repairCategoryName": zod.string(),
+  "ragBucket": zod.enum(['red', 'amber', 'green']).describe('Operational bucket: red = Must Do, amber = Should Do, green = Could Do.'),
+  "releaseHold": zod.boolean().describe('Engine cannot be released to service until this repair is done.'),
   "severity": zod.number().describe('0-1 severity score'),
   "confidence": zod.number().describe('0-1 confidence score'),
   "status": zod.enum(['pending', 'approved', 'rejected', 'pushed', 'failed']),

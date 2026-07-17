@@ -884,6 +884,11 @@ components:
       type: string
       enum: [routine, expedite, urgent, aog]
 
+    RagBucket:
+      type: string
+      description: "Operational bucket: red = Must Do, amber = Should Do, green = Could Do."
+      enum: [red, amber, green]
+
     Engine:
       type: object
       required:
@@ -1100,6 +1105,10 @@ components:
         - failureMode
         - faultDescription
         - priority
+        - repairCategory
+        - repairCategoryName
+        - ragBucket
+        - releaseHold
         - severity
         - confidence
         - status
@@ -1124,6 +1133,19 @@ components:
         failureMode: { type: string }
         faultDescription: { type: string }
         priority: { $ref: "#/components/schemas/Priority" }
+        repairCategory:
+          type: integer
+          minimum: 1
+          maximum: 7
+          description: >-
+            MRO repair category: 1 Airworthiness Mandatory, 2 LLP Compliance,
+            3 Safety-Critical, 4 Regulatory (AD/SB), 5 Functional Restoration,
+            6 Reliability Improvement, 7 Cosmetic.
+        repairCategoryName: { type: string }
+        ragBucket: { $ref: "#/components/schemas/RagBucket" }
+        releaseHold:
+          type: boolean
+          description: Engine cannot be released to service until this repair is done.
         severity: { type: number, description: "0-1 severity score" }
         confidence: { type: number, description: "0-1 confidence score" }
         status: { $ref: "#/components/schemas/RecommendationStatus" }

@@ -9,6 +9,7 @@ import type { Evidence } from './evidence';
 import type { LifeLimitedPart } from './lifeLimitedPart';
 import type { MaintenanceTask } from './maintenanceTask';
 import type { Priority } from './priority';
+import type { RagBucket } from './ragBucket';
 import type { RecommendationStatus } from './recommendationStatus';
 
 export interface Recommendation {
@@ -20,6 +21,16 @@ export interface Recommendation {
   failureMode: string;
   faultDescription: string;
   priority: Priority;
+  /**
+     * MRO repair category: 1 Airworthiness Mandatory, 2 LLP Compliance, 3 Safety-Critical, 4 Regulatory (AD/SB), 5 Functional Restoration, 6 Reliability Improvement, 7 Cosmetic.
+     * @minimum 1
+     * @maximum 7
+     */
+  repairCategory: number;
+  repairCategoryName: string;
+  ragBucket: RagBucket;
+  /** Engine cannot be released to service until this repair is done. */
+  releaseHold: boolean;
   /** 0-1 severity score */
   severity: number;
   /** 0-1 confidence score */

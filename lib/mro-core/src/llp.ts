@@ -5,6 +5,7 @@ import type {
   Priority,
   Recommendation,
 } from "./types.js";
+import { classifyRuleId } from "./repair-category.js";
 
 // Life-Limited Part (LLP) status tracking for the Trent XWB-84 demonstrator.
 // The catalogue follows the three-shaft Trent architecture (Fan, IP Compressor,
@@ -284,6 +285,7 @@ export function buildLlpRecommendation(
     lifeLimitedParts: toLifeLimitedParts(drivingLlps),
     evidence: [],
     regulatoryRefs: ["14 CFR §33.70 (illustrative)", "EASA CS-E 515 (illustrative)"],
+    ...classifyRuleId(LLP_RULE_ID),
     ruleId: LLP_RULE_ID,
     ruleName: LLP_RULE_NAME,
     recommendedInductionDate: addDays(now, inductionOffset),
