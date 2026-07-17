@@ -137,10 +137,11 @@ export function validateOntology(
 // Rules reference the domain model conceptually. Rules that produce
 // Recommendations from Sensors and FailureModes touch those core classes.
 const RULE_CORE_CLASSES = new Set([
-  "Rule",
+  "DiagnosticRuleDefinition",
   "Sensor",
+  "MeasurementObservation",
   "FailureMode",
-  "Recommendation",
+  "MaintenanceRecommendation",
   "Component",
 ]);
 

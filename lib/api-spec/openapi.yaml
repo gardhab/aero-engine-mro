@@ -1354,6 +1354,10 @@ components:
         name: { type: string }
         type: { type: string }
         description: { type: ["string", "null"] }
+        enumValues:
+          type: ["array", "null"]
+          description: "Controlled vocabulary: when present, only these values are allowed"
+          items: { type: string }
 
     OntologyClass:
       type: object

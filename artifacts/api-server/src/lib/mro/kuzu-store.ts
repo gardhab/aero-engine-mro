@@ -204,6 +204,17 @@ export class KuzuGraphStore implements GraphStore {
     return (await this.getNode(id)) as GraphNode;
   }
 
+  async deleteEdges(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    const conn = this.c();
+    const stmt = await conn.prepare(
+      "MATCH (:Entity)-[r:Rel {id: $id}]->(:Entity) DELETE r",
+    );
+    for (const id of ids) {
+      await conn.execute(stmt, { id });
+    }
+  }
+
   async close(): Promise<void> {
     this.conn = null;
   }

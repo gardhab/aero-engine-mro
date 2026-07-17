@@ -40,6 +40,8 @@ export interface GraphStore {
     id: string,
     properties: Record<string, unknown>,
   ): Promise<GraphNode | null>;
+  /** Delete edges by id (projection-migration cleanup of superseded edges). */
+  deleteEdges(ids: string[]): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -106,6 +108,12 @@ export class InMemoryGraphStore implements GraphStore {
       [CORRECTED_FLAG]: true,
     };
     return publicNode(node);
+  }
+
+  async deleteEdges(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    const drop = new Set(ids);
+    this.data.edges = this.data.edges.filter((e) => !drop.has(e.id));
   }
 
   async close(): Promise<void> {}

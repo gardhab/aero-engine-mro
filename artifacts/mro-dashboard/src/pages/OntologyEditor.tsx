@@ -28,10 +28,10 @@ import { useQueryClient } from '@tanstack/react-query';
 
 /** Top-down layout layers: physical hierarchy Engine → Module → Component → PiecePart reads vertically. */
 const UML_LAYERS: Record<string, number> = {
-  ServiceRequest: 0, MroCommitment: 0, ComplianceDirective: 0,
-  Engine: 1, Recommendation: 1, Rule: 1,
-  EngineModule: 2, Sensor: 2, FailureMode: 2, MaintenanceTask: 2,
-  Component: 3, RegulatoryReference: 3,
+  ServiceRequest: 0, MroCommitment: 0, ComplianceDirective: 0, EngineModel: 0, Aircraft: 0,
+  Engine: 1, MaintenanceRecommendation: 1, DiagnosticRuleDefinition: 1, EngineInstallation: 1,
+  EngineModule: 2, Sensor: 2, FailureMode: 2, MaintenanceTaskDefinition: 2, MeasurementObservation: 2,
+  Component: 3, RegulatoryRequirement: 3, LlpCategory: 3,
   LifeLimitedPart: 4, PiecePart: 4,
 };
 
@@ -80,7 +80,7 @@ function UmlAssociationEdge({
 
 const umlEdgeTypes = { umlAssociation: UmlAssociationEdge };
 
-interface UmlAttr { name: string; type: string }
+interface UmlAttr { name: string; type: string; enumValues?: string[] | null }
 
 function UmlClassNode({ data }: { data: { label: string; deprecated: boolean; attributes: UmlAttr[] } }) {
   const fg = data.deprecated ? '#8d8d8d' : '#161616';
@@ -101,8 +101,12 @@ function UmlClassNode({ data }: { data: { label: string; deprecated: boolean; at
       <div style={{ padding: '4px 8px', minHeight: 16 }}>
         {data.attributes.length === 0 && <span style={{ color: '#8d8d8d' }}>&nbsp;</span>}
         {data.attributes.map(a => (
-          <div key={a.name} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            + {a.name}: {a.type}
+          <div
+            key={a.name}
+            style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+            title={a.enumValues?.length ? `«enumeration» ${a.enumValues.join(' | ')}` : undefined}
+          >
+            + {a.name}: {a.enumValues?.length ? '«enum»' : a.type}
           </div>
         ))}
       </div>
@@ -192,7 +196,7 @@ export default function OntologyEditor() {
       data: {
         label: c.label,
         deprecated: c.deprecated,
-        attributes: (c.attributes ?? []).map(a => ({ name: a.name, type: a.type })),
+        attributes: (c.attributes ?? []).map(a => ({ name: a.name, type: a.type, enumValues: (a as any).enumValues })),
       },
     }));
 

@@ -61,7 +61,7 @@ catalogs:
       specifier: ^4.1.14
       version: 4.3.2
     tsx:
-      specifier: ^4.21.0
+      specifier: 4.23.0
       version: 4.23.0
     vite:
       specifier: ^7.3.2
@@ -683,6 +683,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.5
+      tsx:
+        specifier: 'catalog:'
+        version: 4.23.0
 
   scripts:
     devDependencies:

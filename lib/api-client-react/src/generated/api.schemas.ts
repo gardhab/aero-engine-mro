@@ -365,6 +365,11 @@ export interface OntologyAttribute {
   type: string;
   /** @nullable */
   description?: string | null;
+  /**
+     * Controlled vocabulary: when present, only these values are allowed
+     * @nullable
+     */
+  enumValues?: string[] | null;
 }
 
 export interface OntologyClass {

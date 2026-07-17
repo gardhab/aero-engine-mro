@@ -12,6 +12,7 @@ import {
 } from "@workspace/db";
 import {
   FLEET,
+  applyOntologyRestructure,
   SEED_CLASSES,
   SEED_RELATIONSHIPS,
   SEED_RULES,
@@ -183,7 +184,14 @@ async function ensureOntologySeedCurrent(): Promise<void> {
     (r): r is NonNullable<typeof r> => r != null,
   );
   await db.transaction(async (tx) => {
-  for (const row of rows) {
+  for (const rawRow of rows) {
+      // Structural restructure migration (definition/instance split): rename
+      // class ids, rewire relationship endpoints, and drop attributes that
+      // moved to another class — preserving every other SME edit in place.
+      const row = applyOntologyRestructure(rawRow);
+      const restructured =
+        row.classes !== rawRow.classes ||
+        row.relationships !== rawRow.relationships;
       const classIds = new Set(row.classes.map((c) => c.id));
       const relIds = new Set(row.relationships.map((r) => r.id));
       const missingClasses = SEED_CLASSES_FULL.filter(
@@ -216,7 +224,8 @@ async function ensureOntologySeedCurrent(): Promise<void> {
         missingClasses.length === 0 &&
         missingRels.length === 0 &&
         attributePatches.size === 0 &&
-        !needsMultiplicityBackfill
+        !needsMultiplicityBackfill &&
+        !restructured
       )
         continue;
       const patched = row.classes.map((c) => {
@@ -245,6 +254,7 @@ async function ensureOntologySeedCurrent(): Promise<void> {
           addedClasses: missingClasses.map((c) => c.id),
           addedRelationships: missingRels.map((r) => r.id),
           patchedAttributeClasses: [...attributePatches.keys()],
+          restructured,
         },
         "Backfilled seed ontology additions",
       );

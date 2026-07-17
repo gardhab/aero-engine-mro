@@ -3,6 +3,7 @@ import type {
   GraphData,
   GraphEdge,
   GraphNode,
+  ParameterReading,
   Recommendation,
   Rule,
 } from "../types.js";
@@ -29,6 +30,8 @@ export function buildGraph(
   exchanges: ShopVisitExchange[] = [],
   llps: EngineLlp[] = [],
   workPackageTasks: WorkPackageTask[] = [],
+  /** Latest reading per engine+parameter, projected as MeasurementObservations. */
+  latestReadings: ParameterReading[] = [],
 ): GraphData {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
@@ -57,7 +60,39 @@ export function buildGraph(
     });
   }
 
-  // Global failure-mode and rule nodes.
+  // Measurement observations: the latest reading per engine+parameter,
+  // produced by the sensor. Diagnostic rules evaluate these observations,
+  // not the physical sensor.
+  const obsIdOf = (engineId: string, parameter: string) =>
+    `obs:${engineId}:${parameter}`;
+  const obsByParameter = new Map<string, ParameterReading[]>();
+  for (const r of latestReadings) {
+    const list = obsByParameter.get(r.parameter) ?? [];
+    list.push(r);
+    obsByParameter.set(r.parameter, list);
+    addNode({
+      id: obsIdOf(r.engineId, r.parameter),
+      type: "MeasurementObservation",
+      label: `${r.label} · ${r.engineId}`,
+      properties: {
+        engineId: r.engineId,
+        parameter: r.parameter,
+        value: r.value,
+        unit: r.unit,
+        cycle: r.cycle,
+        timestamp: r.timestamp,
+        status: r.status,
+      },
+    });
+    addEdge({
+      id: `e:${r.parameter}:${r.engineId}:produces`,
+      source: `sensor:${r.parameter}`,
+      target: obsIdOf(r.engineId, r.parameter),
+      label: "produces",
+    });
+  }
+
+  // Global failure-mode and rule-definition nodes.
   for (const rule of rules) {
     const fmId = `failuremode:${slug(rule.failureMode)}`;
     addNode({
@@ -68,7 +103,7 @@ export function buildGraph(
     });
     addNode({
       id: `rule:${rule.id}`,
-      type: "Rule",
+      type: "DiagnosticRuleDefinition",
       label: rule.name,
       properties: {
         operator: rule.operator,
@@ -85,18 +120,39 @@ export function buildGraph(
     });
     const sensor = PARAMETER_BY_CODE[rule.parameter];
     if (sensor) {
-      addEdge({
-        id: `e:${rule.id}:evaluates`,
-        source: `rule:${rule.id}`,
-        target: `sensor:${rule.parameter}`,
-        label: "evaluates",
-      });
-      addEdge({
-        id: `e:${rule.parameter}:${slug(rule.failureMode)}:indicates`,
-        source: `sensor:${rule.parameter}`,
-        target: fmId,
-        label: "indicates",
-      });
+      const observations = obsByParameter.get(rule.parameter) ?? [];
+      if (observations.length > 0) {
+        // Rules evaluate observations; observation trends indicate failure modes.
+        for (const obs of observations) {
+          addEdge({
+            id: `e:${rule.id}:${obs.engineId}:evaluates`,
+            source: `rule:${rule.id}`,
+            target: obsIdOf(obs.engineId, rule.parameter),
+            label: "evaluates",
+          });
+          addEdge({
+            id: `e:${rule.parameter}:${obs.engineId}:${slug(rule.failureMode)}:indicates`,
+            source: obsIdOf(obs.engineId, rule.parameter),
+            target: fmId,
+            label: "indicates",
+          });
+        }
+      } else {
+        // No observations projected (e.g. no readings supplied): keep the
+        // sensor-level trace so the diagnostic chain stays connected.
+        addEdge({
+          id: `e:${rule.id}:evaluates`,
+          source: `rule:${rule.id}`,
+          target: `sensor:${rule.parameter}`,
+          label: "evaluates",
+        });
+        addEdge({
+          id: `e:${rule.parameter}:${slug(rule.failureMode)}:indicates`,
+          source: `sensor:${rule.parameter}`,
+          target: fmId,
+          label: "indicates",
+        });
+      }
     }
   }
 
@@ -115,6 +171,8 @@ export function buildGraph(
     ]),
   );
   for (const eng of engines) {
+    // Serialized asset: identity is the ESN alone. Design (model) and airframe
+    // (tail number) are separate nodes linked by instanceOf / installation.
     addNode({
       id: `engine:${eng.esn}`,
       type: "Engine",
@@ -122,13 +180,66 @@ export function buildGraph(
       properties: {
         engineId: eng.esn,
         esn: eng.esn,
-        model: eng.model,
-        tailNumber: eng.tailNumber,
         status: eng.status,
         healthScore: eng.healthScore,
+        tsn: eng.tsn,
         csn: eng.csn,
       },
     });
+
+    // Design definition: one EngineModel node per model/family.
+    const modelId = `model:${slug(eng.model)}`;
+    addNode({
+      id: modelId,
+      type: "EngineModel",
+      label: eng.model,
+      properties: { modelCode: eng.model },
+    });
+    addEdge({
+      id: `e:${eng.esn}:instanceOf`,
+      source: `engine:${eng.esn}`,
+      target: modelId,
+      label: "instanceOf",
+    });
+
+    // Airframe identity: Aircraft owns the tail number; the engine is linked
+    // through a time-bounded EngineInstallation (currently installed → no
+    // removedDate).
+    if (eng.tailNumber) {
+      const aircraftId = `aircraft:${slug(eng.tailNumber)}`;
+      addNode({
+        id: aircraftId,
+        type: "Aircraft",
+        label: eng.tailNumber,
+        properties: {
+          tailNumber: eng.tailNumber,
+          operator: eng.operator ?? null,
+        },
+      });
+      const installId = `install:${eng.esn}:${slug(eng.tailNumber)}`;
+      addNode({
+        id: installId,
+        type: "EngineInstallation",
+        label: `${eng.esn} on ${eng.tailNumber}`,
+        properties: {
+          engineId: eng.esn,
+          tailNumber: eng.tailNumber,
+          removedDate: null,
+        },
+      });
+      addEdge({
+        id: `e:${eng.esn}:hasInstallation`,
+        source: `engine:${eng.esn}`,
+        target: installId,
+        label: "hasInstallation",
+      });
+      addEdge({
+        id: `e:${eng.esn}:${slug(eng.tailNumber)}:onAircraft`,
+        source: installId,
+        target: aircraftId,
+        label: "onAircraft",
+      });
+    }
     for (const module of modulesUsed) {
       const modId = `module:${eng.esn}:${slug(module)}`;
       addNode({
@@ -154,7 +265,21 @@ export function buildGraph(
     }
 
     // Life-limited parts installed on this engine, attached to their module.
+    // The serialized part carries accumulated usage; certified life limits
+    // live on the part-number LlpCategory design node it conforms to.
     for (const part of llpsByEngine.get(eng.esn) ?? []) {
+      const catId = `llpcat:${slug(part.partNumber)}`;
+      addNode({
+        id: catId,
+        type: "LlpCategory",
+        label: `${part.partName} · ${part.partNumber}`,
+        properties: {
+          partNumber: part.partNumber,
+          partName: part.partName,
+          lifeLimitCycles: part.lifeLimitCycles,
+          lifeLimitSource: "Engine Manual (Ch. 05 Airworthiness Limitations)",
+        },
+      });
       const llpId = `llp:${part.engineId}:${part.partNumber}`;
       addNode({
         id: llpId,
@@ -166,11 +291,16 @@ export function buildGraph(
           serialNumber: part.serialNumber,
           module: part.module,
           position: part.position,
-          lifeLimitCycles: part.lifeLimitCycles,
-          csn: part.csn,
+          cyclesSinceNew: part.csn,
           remainingCycles: part.remainingCycles,
           lifeStatus: part.status,
         },
+      });
+      addEdge({
+        id: `e:${part.engineId}:${part.partNumber}:conformsTo`,
+        source: llpId,
+        target: catId,
+        label: "conformsTo",
       });
       addEdge({
         id: `e:${part.engineId}:${slug(part.module)}:${part.partNumber}:hasComponent`,
@@ -210,7 +340,7 @@ export function buildGraph(
     const recId = `rec:${rec.id}`;
     addNode({
       id: recId,
-      type: "Recommendation",
+      type: "MaintenanceRecommendation",
       label: `${rec.failureMode} (${rec.priority})`,
       properties: {
         engineId: rec.engineId,
@@ -242,7 +372,7 @@ export function buildGraph(
     const taskId = `tcn:${t.tcn}`;
     addNode({
       id: taskId,
-      type: "MaintenanceTask",
+      type: "MaintenanceTaskDefinition",
       label: `${t.tcn} · ${t.ataCode}`,
       properties: {
         engineId: t.engineId,
@@ -338,6 +468,54 @@ export function buildGraph(
   }
 
   return { nodes, edges };
+}
+
+/**
+ * Superseded sensor-level diagnostic edges: the sensor/observation split moved
+ * `evaluates` / `indicates` from the physical Sensor onto MeasurementObservation
+ * nodes, but graph *merge* never deletes, so pre-split edges survive. Returns
+ * the ids of sensor-level edges that have been replaced by an observation-level
+ * edge in the SAME context — a rule's `evaluates` is stale only if that rule
+ * now evaluates an observation, and a sensor's `indicates` to a failure mode is
+ * stale only if an observation of that sensor's parameter now indicates that
+ * same failure mode. Rules/parameters without projected observations keep
+ * their sensor-level fallback edges so their diagnostic chain stays connected.
+ */
+export function supersededSensorEdgeIds(data: GraphData): string[] {
+  const typeById = new Map(data.nodes.map((n) => [n.id, n.type]));
+  const paramOfObs = new Map(
+    data.nodes
+      .filter((n) => n.type === "MeasurementObservation")
+      .map((n) => [n.id, String(n.properties.parameter ?? "")]),
+  );
+  const codeOfSensor = new Map(
+    data.nodes
+      .filter((n) => n.type === "Sensor")
+      .map((n) => [n.id, String(n.properties.code ?? "")]),
+  );
+  // Rules that evaluate at least one observation.
+  const rulesWithObsEvaluates = new Set(
+    data.edges
+      .filter((e) => e.label === "evaluates" && paramOfObs.has(e.target))
+      .map((e) => e.source),
+  );
+  // parameter → failure-mode targets indicated at observation level.
+  const obsIndicated = new Set(
+    data.edges
+      .filter((e) => e.label === "indicates" && paramOfObs.has(e.source))
+      .map((e) => `${paramOfObs.get(e.source)}→${e.target}`),
+  );
+  return data.edges
+    .filter((e) => {
+      if (e.label === "evaluates" && typeById.get(e.target) === "Sensor") {
+        return rulesWithObsEvaluates.has(e.source);
+      }
+      if (e.label === "indicates" && typeById.get(e.source) === "Sensor") {
+        return obsIndicated.has(`${codeOfSensor.get(e.source)}→${e.target}`);
+      }
+      return false;
+    })
+    .map((e) => e.id);
 }
 
 /** Filter a graph by ontology type and/or engine, expanding one hop to keep context. */

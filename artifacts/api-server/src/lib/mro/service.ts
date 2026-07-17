@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   db,
   enginesTable,
@@ -27,6 +27,7 @@ import {
   nodeCountByClass,
   relevantLlpsForModules,
   resolveSapConfig,
+  supersededSensorEdgeIds,
   toLifeLimitedParts,
   type ActivityType,
   type OntologyClass,
@@ -254,6 +255,23 @@ export async function rebuildGraphMerge(): Promise<void> {
   const store = await getGraphStore();
   const graph = buildGraph(...(await loadGraphInputs()));
   await store.merge(graph);
+  await pruneSupersededDiagnosticEdges();
+}
+
+/**
+ * Projection-migration cleanup: the sensor/observation split moved the
+ * diagnostic chain (`evaluates`, `indicates`) from the physical Sensor onto
+ * MeasurementObservation nodes. Merge never deletes, so remove pre-split
+ * sensor-level edges — but only those with an observation-level replacement
+ * in the same rule/parameter context (see supersededSensorEdgeIds).
+ */
+async function pruneSupersededDiagnosticEdges(): Promise<void> {
+  const store = await getGraphStore();
+  const stale = supersededSensorEdgeIds(await store.getGraph());
+  if (stale.length > 0) {
+    await store.deleteEdges(stale);
+    logger.info({ removed: stale.length }, "Pruned superseded sensor-level diagnostic edges");
+  }
 }
 
 /** Full graph rebuild from scratch (used on seed). */
@@ -264,15 +282,31 @@ export async function rebuildGraphReplace(): Promise<void> {
 
 /** Load and map everything the graph projection consumes, in parallel. */
 async function loadGraphInputs() {
-  const [engineRows, ruleRows, recRows, exchangeRows, llpRows, wpTasks] =
-    await Promise.all([
-      db.select().from(enginesTable),
-      db.select().from(rulesTable),
-      db.select().from(recommendationsTable),
-      db.select().from(shopVisitExchangesTable),
-      db.select().from(llpsTable),
-      loadAllWorkPackageTasks(),
-    ]);
+  const [
+    engineRows,
+    ruleRows,
+    recRows,
+    exchangeRows,
+    llpRows,
+    wpTasks,
+    latestReadingRows,
+  ] = await Promise.all([
+    db.select().from(enginesTable),
+    db.select().from(rulesTable),
+    db.select().from(recommendationsTable),
+    db.select().from(shopVisitExchangesTable),
+    db.select().from(llpsTable),
+    loadAllWorkPackageTasks(),
+    // Latest reading per engine+parameter → MeasurementObservation nodes.
+    db
+      .selectDistinctOn([readingsTable.engineId, readingsTable.parameter])
+      .from(readingsTable)
+      .orderBy(
+        readingsTable.engineId,
+        readingsTable.parameter,
+        desc(readingsTable.cycle),
+      ),
+  ]);
   return [
     engineRows.map((e) => toEngine(e, 0)),
     recRows.map(toRecommendation),
@@ -280,6 +314,7 @@ async function loadGraphInputs() {
     exchangeRows.map(toShopVisitExchange),
     llpRows.map(toEngineLlp),
     wpTasks,
+    latestReadingRows.map(toReading),
   ] as const;
 }
 
@@ -394,10 +429,11 @@ export function enrichOntologyClasses(
   graphCounts: Record<string, number>,
 ): OntologyClass[] {
   const ruleCoreClasses = new Set([
-    "Rule",
+    "DiagnosticRuleDefinition",
     "Sensor",
+    "MeasurementObservation",
     "FailureMode",
-    "Recommendation",
+    "MaintenanceRecommendation",
     "Component",
   ]);
   return classes.map((c) => ({

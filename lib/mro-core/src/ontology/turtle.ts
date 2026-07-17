@@ -53,9 +53,18 @@ export function serializeToTurtle(ontology: Ontology): string {
       lines.push(
         `mro:${cls.id}_${attr.name} a owl:DatatypeProperty ;`,
         `    rdfs:domain mro:${cls.id} ;`,
-        `    rdfs:range ${xsdType(attr.type)} ;`,
-        `    rdfs:label "${esc(attr.name)}" .`,
       );
+      if (attr.enumValues && attr.enumValues.length > 0) {
+        // Controlled vocabulary: enumerated datatype via owl:oneOf.
+        lines.push(
+          `    rdfs:range [ a rdfs:Datatype ; owl:oneOf ( ${attr.enumValues
+            .map((v) => `"${esc(v)}"`)
+            .join(" ")} ) ] ;`,
+        );
+      } else {
+        lines.push(`    rdfs:range ${xsdType(attr.type)} ;`);
+      }
+      lines.push(`    rdfs:label "${esc(attr.name)}" .`);
     }
     lines.push("");
   }

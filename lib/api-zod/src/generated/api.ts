@@ -1304,7 +1304,8 @@ export const GetOntologyResponse = zod.object({
   "attributes": zod.array(zod.object({
   "name": zod.string(),
   "type": zod.string(),
-  "description": zod.string().nullish()
+  "description": zod.string().nullish(),
+  "enumValues": zod.array(zod.string()).nullish().describe('Controlled vocabulary: when present, only these values are allowed')
 })),
   "instanceCount": zod.number(),
   "ruleCount": zod.number()
@@ -1338,7 +1339,8 @@ export const GetOntologyDraftResponse = zod.object({
   "attributes": zod.array(zod.object({
   "name": zod.string(),
   "type": zod.string(),
-  "description": zod.string().nullish()
+  "description": zod.string().nullish(),
+  "enumValues": zod.array(zod.string()).nullish().describe('Controlled vocabulary: when present, only these values are allowed')
 })),
   "instanceCount": zod.number(),
   "ruleCount": zod.number()
@@ -1394,7 +1396,8 @@ export const CreateOntologyClassBody = zod.object({
   "attributes": zod.array(zod.object({
   "name": zod.string(),
   "type": zod.string(),
-  "description": zod.string().nullish()
+  "description": zod.string().nullish(),
+  "enumValues": zod.array(zod.string()).nullish().describe('Controlled vocabulary: when present, only these values are allowed')
 })).optional()
 })
 
@@ -1407,7 +1410,8 @@ export const CreateOntologyClassResponse = zod.object({
   "attributes": zod.array(zod.object({
   "name": zod.string(),
   "type": zod.string(),
-  "description": zod.string().nullish()
+  "description": zod.string().nullish(),
+  "enumValues": zod.array(zod.string()).nullish().describe('Controlled vocabulary: when present, only these values are allowed')
 })),
   "instanceCount": zod.number(),
   "ruleCount": zod.number()
@@ -1429,7 +1433,8 @@ export const UpdateOntologyClassBody = zod.object({
   "attributes": zod.array(zod.object({
   "name": zod.string(),
   "type": zod.string(),
-  "description": zod.string().nullish()
+  "description": zod.string().nullish(),
+  "enumValues": zod.array(zod.string()).nullish().describe('Controlled vocabulary: when present, only these values are allowed')
 })).optional()
 })
 
@@ -1442,7 +1447,8 @@ export const UpdateOntologyClassResponse = zod.object({
   "attributes": zod.array(zod.object({
   "name": zod.string(),
   "type": zod.string(),
-  "description": zod.string().nullish()
+  "description": zod.string().nullish(),
+  "enumValues": zod.array(zod.string()).nullish().describe('Controlled vocabulary: when present, only these values are allowed')
 })),
   "instanceCount": zod.number(),
   "ruleCount": zod.number()

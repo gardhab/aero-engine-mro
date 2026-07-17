@@ -163,6 +163,8 @@ export interface OntologyAttribute {
   name: string;
   type: string;
   description?: string | null;
+  /** Controlled vocabulary: when present, the attribute is an enumeration and only these values are allowed. */
+  enumValues?: string[] | null;
 }
 
 export interface OntologyClass {
