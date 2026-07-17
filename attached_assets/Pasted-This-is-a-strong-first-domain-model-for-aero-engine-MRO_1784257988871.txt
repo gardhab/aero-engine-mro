@@ -1,0 +1,225 @@
+This is a strong **first domain model** for aero-engine MRO: it covers the core chain from an Engine through modules, measurements, diagnosis, recommendations, tasks, regulatory references, and material/components. The diagram is currently closer to a **UML logical data model** than a formal ontology, but it is a sound basis for developing one.[1]
+
+## What works well
+
+- The model captures a meaningful decision flow: **Sensor / Measurement → Diagnostic Rule → Failure Mode → Work Recommendation → Maintenance Task**. This is exactly the kind of semantic chain needed to make condition-based maintenance explainable and traceable.[1]
+- You have separated reusable reference knowledge—such as `Compliance Directive`, `Regulatory Reference`, `Diagnostic Rule`, and `Failure Mode`—from operational objects such as `Engine`, `Engine Module`, `Maintenance Task`, and `MRO Commitment`.[1]
+- The decomposition of `Engine` into `Engine Module`, then `Component`, with specializations such as `Life-Limited Part` and `Piece Part`, is a sensible starting point for an engine configuration hierarchy.[1]
+- Including `MRO Commitment`, particularly `shopOrder`, `committedTurnDays`, `targetTurnDays`, and `unscheduledCostCapUsd`, establishes a useful connection between technical maintenance decisions and operational/commercial outcomes.[1]
+
+## Key modelling issues
+
+### Ontology versus UML
+
+A UML class model describes system structures; an ontology should explicitly define **classes, individuals, properties, constraints, controlled vocabularies, and inference rules**.
+
+For example, `Maintenance Task` should not only have a `skill` string. It should connect to controlled concepts such as `Skill`, `Qualification`, `Work Center`, `Maintenance Program`, and `Task Status`. That permits questions such as: *Which open tasks require a certified borescope inspector?*
+
+Similarly, terms such as `status`, `priority`, `workscopeLevel`, `mechanism`, `category`, and `shopOrder` should not be unconstrained strings. They should be ontology concepts or enumerated controlled values.
+
+### Cardinalities are ambiguous
+
+Several multiplicities appear incomplete or potentially inverted:
+
+| Relationship | Current interpretation | Recommended interpretation |
+|---|---|---|
+| Engine–Engine Module | An engine has 1..* modules | Use `Engine hasInstalledModule EngineModuleInstallation`; distinguish a module *type* from the serialized module installed at a particular position |
+| Engine Module–Component | Module has 0..* components | Use an intermediate `ComponentInstallation`, because components are installed, removed, swapped, and tracked over time |
+| Diagnostic Rule–Sensor / Measurement | Rule evaluates measurements | A rule should evaluate one or more `Measurement` observations, not the physical sensor itself |
+| Work Recommendation–Maintenance Task | Recommendation recommends 1..* tasks | Allow 0..* tasks, because a recommendation may be deferred, rejected, superseded, or grouped into a work package |
+| Maintenance Task–Regulatory Reference | Task governed by 0..* references | A regulatory reference can govern many tasks; also distinguish mandatory compliance from informative guidance |
+| Component–Piece Part | Component has 0..* piece parts | This should likely model a bill-of-material or assembly relationship, with quantity, effectivity, and position |
+
+The diagram should show multiplicities at **both ends** consistently; otherwise a reader cannot tell whether, for instance, a measurement can support multiple diagnoses or only one.[1]
+
+## Separate asset identity from design
+
+This is the largest structural improvement to make.
+
+Your current `Engine` attributes combine identity and product-definition information: `esn`, `model`, `tailNumber`, `tsn`, and `csn`.  In an MRO ontology, split these concepts:[1]
+
+- `Engine` or `EngineInstance`: the serialized physical asset; identified by ESN.
+- `EngineModel` / `EngineType`: the approved engine design or family.
+- `Aircraft`: identified by registration/tail number.
+- `EngineInstallation`: the time-bounded installation of an engine on an aircraft position.
+- `EngineModuleInstance`: serialized module asset.
+- `EngineModuleType`: module design or position, such as fan, compressor, combustor, turbine, gearbox, or accessory gearbox.
+- `ComponentInstance` and `ComponentPartNumber`: distinguish the serialised item from its design definition.
+- `PartRevision`, `ModificationStandard`, and `Service Bulletin`: manage configuration effectivity.
+
+`tailNumber` should normally be an attribute of `Aircraft`, not `Engine`, because an engine may move among aircraft across its service life. Likewise, `TSN` and `CSN` are usually usage accumulators whose values change over time, so model them as dated `UtilizationRecord` or `UsageCounterReading`, rather than static engine attributes.
+
+## Introduce lifecycle events
+
+The proposed model describes the *current state* of an engine but not its history. An MRO ontology needs events to preserve configuration and airworthiness traceability.
+
+Add these classes:
+
+- `MaintenanceVisit` or `ShopVisit`: the overall induction-to-release event.
+- `WorkOrder` / `ShopOrder`: the execution container; your `shopOrder` should be a real entity, rather than only an attribute of `MRO Commitment`.[1]
+- `MaintenanceTaskExecution`: the performed instance of a task, including performer, completion time, findings, and sign-off.
+- `InspectionEvent` and `MeasurementObservation`: who/what/when/how an observation was obtained.
+- `RemovalEvent`, `InstallationEvent`, `RepairEvent`, `OverhaulEvent`, and `DispositionEvent`.
+- `MaterialMovement` and `PartTraceabilityRecord`.
+- `ReleaseToService` / `CertificateOfRelease`: the controlled completion and airworthiness-release event.
+- `Nonconformance`, `Finding`, `DamageAssessment`, and `RepairDisposition`.
+
+This allows you to answer questions such as: *Which LLP was removed from engine ESN X during the last shop visit, why, by whom, and with what remaining cycle life?*
+
+## Clarify maintenance decision logic
+
+Your `Diagnostic Rule` has `name`, `operator`, and `threshold`; the model then links a rule to both measurements and failure modes.  This is a good start, but it needs a richer structure for real diagnostic use.[1]
+
+Recommended pattern:
+
+```text
+MeasurementObservation
+  -> evaluatedBy -> DiagnosticRule
+  -> produces -> DiagnosticAssessment
+  -> identifies / supports -> FailureMode
+  -> yields -> MaintenanceRecommendation
+  -> is realizedBy -> MaintenanceTaskExecution
+```
+
+Add:
+
+- `DiagnosticAssessment`: conclusion for one asset at one point in time.
+- `ConfidenceScore`, `Severity`, `Evidence`, and `Explanation`.
+- `RuleVersion` and `ModelVersion`: essential for auditability when thresholds or AI models evolve.
+- `ConditionIndicator`: vibration, EGT margin, oil debris, borescope finding, oil pressure, temperature, etc.
+- `FailureEffect`, `FailureCause`, and `DetectionMethod`: to align with FMEA-style reasoning.
+- `ApplicabilityCondition`: engine model, module configuration, service bulletin status, environmental context, or operating profile.
+
+Avoid directly stating that a sensor “indicates” a failure mode. A sensor produces data; an observation supports or triggers a diagnostic assessment, which may identify a failure mode with a confidence level.
+
+## Improve the compliance model
+
+`Compliance Directive` is presently linked to `Engine` and appears to be “dispatched as” an `MRO Commitment`; that semantic relationship is not clear.[1]
+
+Use a distinction like:
+
+- `RegulatoryRequirement`: an obligation from an authority or approved source.
+- `AirworthinessDirective`: mandatory instruction with applicability and compliance deadlines.
+- `ServiceBulletin`: OEM-issued technical instruction, potentially mandatory depending on adoption.
+- `MaintenanceProgramRequirement`: approved operator/MRO program requirement.
+- `ComplianceAssessment`: an assertion that a requirement is met, deferred, not applicable, or overdue.
+- `ComplianceEvidence`: linked maintenance records, inspection results, certificates, and signatures.
+
+Key properties should include:
+
+- `appliesTo` — engine model, module, part number, serial-number range, or configuration.
+- `requiresTask` — required maintenance task.
+- `hasComplianceDeadline` — calendar, cycles, hours, or next-shop-visit limit.
+- `hasComplianceStatus` — compliant, due, overdue, not applicable, pending evidence.
+- `isSupportedBy` — execution record or certificate.
+
+This makes compliance computable rather than merely a citation attached to a task.
+
+## Strengthen LLP modelling
+
+`Life-Limited Part` is correctly identified as a specialization, but `cyclesRemaining` alone is insufficient.[1]
+
+At minimum, add:
+
+- `lifeLimitCycles`, `lifeLimitHours`, and `lifeLimitCalendar`.
+- `cyclesSinceNew`, `cyclesSinceOverhaul`, `hoursSinceNew`, and `hoursSinceOverhaul`.
+- `remainingLife`, derived from the applicable limit and actual accumulated usage.
+- `lifeLimitSource`, such as the approved manual revision or airworthiness directive.
+- `serialNumber`, `partNumber`, `manufacturingBatch`, and traceability/certification fields.
+- `installationDate`, `removalDate`, and accumulated life at installation/removal.
+
+Also distinguish an LLP’s **design category** from a particular serialized LLP instance. The latter is what carries accumulated cycles and airworthiness history.
+
+## Add MRO execution concepts
+
+For shop-floor and operational usefulness, expand `Maintenance Task` beyond `ataCode`, `s1000dCode`, `skill`, `estimatedTAT`, and `status`.[1]
+
+Recommended task properties and relationships:
+
+- `taskType`: inspection, cleaning, repair, replacement, test, NDT, balancing, assembly, documentation.
+- `requiresQualification` and `performedBy`.
+- `requiresTool`, `requiresMaterial`, and `requiresWorkCenter`.
+- `hasPredecessorTask` and `dependsOn`.
+- `plannedStart`, `actualStart`, `actualFinish`, `estimatedDuration`, and `actualDuration`.
+- `hasDisposition`: repair, replace, scrap, accept-as-is, monitor.
+- `generatesFinding` and `generatesEvidence`.
+- `isPartOfWorkPackage` or `ShopVisit`.
+
+Treat ATA and S1000D codes as references to controlled taxonomies. Do not rely only on text values if you need reporting, interoperability, or semantic queries.
+
+## Suggested core ontology
+
+A more durable top-level structure would be:
+
+```text
+PhysicalAsset
+  ├─ EngineInstance
+  ├─ ModuleInstance
+  ├─ ComponentInstance
+  └─ PartInstance
+       └─ LifeLimitedPartInstance
+
+ProductDefinition
+  ├─ EngineModel
+  ├─ ModuleType
+  ├─ PartNumber
+  └─ ConfigurationStandard
+
+OperationalEvent
+  ├─ EngineInstallation
+  ├─ MeasurementObservation
+  ├─ InspectionEvent
+  ├─ MaintenanceTaskExecution
+  ├─ RepairEvent
+  └─ ReleaseToService
+
+MaintenanceKnowledge
+  ├─ FailureMode
+  ├─ DiagnosticRule
+  ├─ ConditionIndicator
+  ├─ MaintenanceTaskDefinition
+  └─ WorkRecommendation
+
+ComplianceKnowledge
+  ├─ RegulatoryRequirement
+  ├─ AirworthinessDirective
+  ├─ ServiceBulletin
+  └─ ComplianceAssessment
+
+CommercialAndPlanning
+  ├─ ShopVisit
+  ├─ WorkOrder
+  ├─ MROCommitment
+  ├─ WorkPackage
+  └─ ResourceRequirement
+```
+
+## Naming recommendations
+
+Use names that clearly distinguish an entity from its data record or definition:
+
+- Rename `Sensor / Measurement` to two classes: `Sensor` and `MeasurementObservation`.
+- Rename `Diagnostic Rule` to `DiagnosticRuleDefinition`; add `DiagnosticAssessment` for its execution result.
+- Rename `Work Recommendation` to `MaintenanceRecommendation`.
+- Rename `Maintenance Task` to `MaintenanceTaskDefinition`; add `MaintenanceTaskExecution`.
+- Rename `Regulatory Reference` to `RegulatoryRequirement` if it conveys an obligation; retain `ReferenceDocument` for a generic citation.
+- Replace generic `status: string` with controlled values appropriate to each entity.
+- Replace `confidence: number` with a defined scale and source—e.g., model probability, rule certainty, or assessor confidence.
+
+## Priority next steps
+
+1. Split **definition, serialized asset, and event** concepts; this will prevent most traceability and configuration problems.
+2. Add `ShopVisit`, `WorkOrder`, `MaintenanceTaskExecution`, `MeasurementObservation`, and `ComplianceAssessment`.
+3. Convert major string attributes into controlled classes or enumerations.
+4. Make all relationship names directional and supply multiplicities at both ends.
+5. Define competency questions before formalising in OWL/RDF—for example:
+   - Which engines have LLPs below their remaining-cycle threshold?
+   - Which open shop visits have tasks driven by unresolved diagnostic findings?
+   - Which recommendations are required to achieve compliance with an applicable directive?
+   - What evidence supports the release-to-service decision for a given engine?
+   - Which failure modes are recurrent by engine model, module, operating environment, and repair disposition?
+
+The proposed model is a valuable starting point, especially for a digital-twin or AI-assisted MRO use case. Its principal gap is the lack of **time-bound operational events and configuration history**; address that before investing in detailed rules, sensors, or AI semantics.
+
+Sources
+[1] pasted_image_1784257867_0.jpeg https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/images/8818548/3eafe2a1-ce77-4960-9149-6d74934502d9/pasted_image_1784257867_0.jpeg
