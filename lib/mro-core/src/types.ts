@@ -286,7 +286,8 @@ export type ActivityType =
   | "pipeline"
   | "ontology"
   | "backtest"
-  | "exchange";
+  | "exchange"
+  | "work_package";
 
 export interface ActivityEvent {
   id: string;

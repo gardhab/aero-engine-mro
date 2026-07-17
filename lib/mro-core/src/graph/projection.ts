@@ -8,6 +8,7 @@ import type {
 } from "../types.js";
 import type { ShopVisitExchange } from "../exchange/types.js";
 import type { EngineLlp } from "../llp.js";
+import type { WorkPackageTask } from "../work-package.js";
 import { PARAMETERS, PARAMETER_BY_CODE } from "../data/parameters.js";
 import { piecePartsForComponent } from "../data/piece-parts.js";
 
@@ -27,6 +28,7 @@ export function buildGraph(
   rules: Rule[],
   exchanges: ShopVisitExchange[] = [],
   llps: EngineLlp[] = [],
+  workPackageTasks: WorkPackageTask[] = [],
 ): GraphData {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
@@ -230,6 +232,35 @@ export function buildGraph(
         source: `rule:${rec.ruleId}`,
         target: recId,
         label: "generates",
+      });
+    }
+  }
+
+  // TCN-tracked work-package tasks: MaintenanceTask instances spawned from an
+  // approved recommendation, carrying their Task Control Number and status.
+  for (const t of workPackageTasks) {
+    const taskId = `tcn:${t.tcn}`;
+    addNode({
+      id: taskId,
+      type: "MaintenanceTask",
+      label: `${t.tcn} · ${t.ataCode}`,
+      properties: {
+        engineId: t.engineId,
+        tcn: t.tcn,
+        status: t.status,
+        ataCode: t.ataCode,
+        s1000dCode: t.s1000dCode ?? null,
+        skill: t.skill,
+        module: t.module,
+        sequence: t.sequence,
+      },
+    });
+    if (nodeIds.has(`rec:${t.recommendationId}`)) {
+      addEdge({
+        id: `e:${t.recommendationId}:${t.tcn}:recommends`,
+        source: `rec:${t.recommendationId}`,
+        target: taskId,
+        label: "recommends",
       });
     }
   }

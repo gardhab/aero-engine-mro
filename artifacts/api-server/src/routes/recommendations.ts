@@ -14,9 +14,11 @@ import { toRecommendation, toSapNotification } from "../lib/mro/mappers";
 import {
   logActivity,
   pushRecommendationToSap,
+  rebuildGraphMerge,
   recomputeEngine,
   runPipeline,
 } from "../lib/mro/service";
+import { ensureWorkPackageForRecommendation } from "../lib/mro/work-packages";
 
 const router: IRouter = Router();
 
@@ -94,6 +96,11 @@ router.post("/recommendations/:id/approve", async (req, res): Promise<void> => {
     `Recommendation ${updated.id} approved for ${updated.engineId}.`,
     { engineId: updated.engineId, recommendationId: updated.id },
   );
+  // Approval spawns the TCN-tracked shop-visit work package; refresh the
+  // knowledge graph so its MaintenanceTask nodes appear immediately.
+  if (await ensureWorkPackageForRecommendation(updated)) {
+    await rebuildGraphMerge();
+  }
   res.json(ApproveRecommendationResponse.parse(toRecommendation(updated)));
 });
 

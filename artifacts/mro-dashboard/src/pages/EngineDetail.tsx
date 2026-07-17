@@ -6,10 +6,15 @@ import {
   useGetEngineReadings,
   useGetEngineLlps,
   useListRecommendations,
+  useListWorkPackages,
+  useUpdateWorkPackageTaskStatus,
   getGetEngineQueryKey,
   getGetEngineHealthQueryKey,
-  getGetEngineLlpsQueryKey
+  getGetEngineLlpsQueryKey,
+  getListWorkPackagesQueryKey,
+  type WorkPackageTaskStatus
 } from '@workspace/api-client-react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -39,6 +44,15 @@ import {
 import { LineChart } from '@carbon/charts-react';
 import { Link } from 'wouter';
 
+const WP_STATUSES = ['not_started', 'in_progress', 'awaiting_parts', 'awaiting_inspection', 'complete'];
+const WP_STATUS_LABEL: Record<string, string> = {
+  not_started: 'Not Started',
+  in_progress: 'In Progress',
+  awaiting_parts: 'Awaiting Parts',
+  awaiting_inspection: 'Awaiting Inspection',
+  complete: 'Complete',
+};
+
 export default function EngineDetail() {
   const [, params] = useRoute('/engines/:esn');
   const esn = params?.esn || '';
@@ -47,6 +61,15 @@ export default function EngineDetail() {
   const { data: health, isLoading: isHealthLoading } = useGetEngineHealth(esn, { query: { enabled: !!esn, queryKey: getGetEngineHealthQueryKey(esn) } });
   const { data: recs, isLoading: isRecsLoading } = useListRecommendations({ engineId: esn });
   const { data: llpSheet, isLoading: isLlpLoading } = useGetEngineLlps(esn, { query: { enabled: !!esn, queryKey: getGetEngineLlpsQueryKey(esn) } });
+  const { data: workPackages, isLoading: isWpLoading } = useListWorkPackages({ engineId: esn }, { query: { enabled: !!esn, queryKey: getListWorkPackagesQueryKey({ engineId: esn }) } });
+  const queryClient = useQueryClient();
+  const statusMut = useUpdateWorkPackageTaskStatus({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListWorkPackagesQueryKey({ engineId: esn }) });
+      }
+    }
+  });
 
   const parameters = health?.parameters.map(p => p.parameter) || [];
   const [selectedParam, setSelectedParam] = useState<string>('');
@@ -129,6 +152,7 @@ export default function EngineDetail() {
           <Tab>Overview & Health</Tab>
           <Tab>Parameter Trends</Tab>
           <Tab>Open Recommendations ({engine.openRecommendations})</Tab>
+          <Tab>Work Packages{workPackages ? ` (${workPackages.length})` : ''}</Tab>
           <Tab>LLP Status{llpSheet ? ` (${llpSheet.parts.filter(p => p.status !== 'ok').length} flagged)` : ''}</Tab>
         </TabList>
         <TabPanels>
@@ -263,6 +287,86 @@ export default function EngineDetail() {
                   ))}
                 </StructuredListBody>
               </StructuredListWrapper>
+            </div>
+          </TabPanel>
+
+          <TabPanel>
+            <div className="mt-4">
+              {isWpLoading ? (
+                <SkeletonPlaceholder style={{ width: '100%', height: '200px' }} />
+              ) : !workPackages || workPackages.length === 0 ? (
+                <Tile>No work packages yet. Approving a recommendation generates a TCN-tracked work package.</Tile>
+              ) : (
+                workPackages.map(wp => (
+                  <div key={wp.id} className="mb-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <div>
+                        <h3>{wp.failureMode} · {wp.component}</h3>
+                        <p style={{ fontSize: '0.875rem' }}>
+                          Source recommendation: <Link href={`/recommendations/${wp.recommendationId}`}>{wp.recommendationId.slice(0, 8)}</Link>
+                          {' '}· {wp.completedTaskCount}/{wp.taskCount} tasks complete
+                        </p>
+                      </div>
+                      <Tag size="lg" type={wp.status === 'complete' ? 'green' : wp.status === 'in_progress' ? 'blue' : 'cool-gray'}>
+                        {WP_STATUS_LABEL[wp.status] ?? wp.status}
+                      </Tag>
+                    </div>
+                    <StructuredListWrapper>
+                      <StructuredListHead>
+                        <StructuredListRow head>
+                          <StructuredListCell head>TCN</StructuredListCell>
+                          <StructuredListCell head>Task</StructuredListCell>
+                          <StructuredListCell head>ATA</StructuredListCell>
+                          <StructuredListCell head>Skill</StructuredListCell>
+                          <StructuredListCell head>Est. Hrs</StructuredListCell>
+                          <StructuredListCell head>Blocking</StructuredListCell>
+                          <StructuredListCell head>Status</StructuredListCell>
+                        </StructuredListRow>
+                      </StructuredListHead>
+                      <StructuredListBody>
+                        {wp.tasks.map(t => (
+                          <StructuredListRow key={t.id}>
+                            <StructuredListCell><strong>{t.tcn}</strong></StructuredListCell>
+                            <StructuredListCell>{t.description}</StructuredListCell>
+                            <StructuredListCell>{t.ataCode}{t.s1000dCode ? ` · ${t.s1000dCode}` : ''}</StructuredListCell>
+                            <StructuredListCell>{t.skill}</StructuredListCell>
+                            <StructuredListCell>{t.estimatedHours}</StructuredListCell>
+                            <StructuredListCell>
+                              {t.status !== 'complete' && t.blockedByTcn && (
+                                <Tag type="red" title={`Waiting on ${t.blockedByTcn}`}>BLOCKED BY {t.blockedByTcn}</Tag>
+                              )}
+                              {t.status !== 'complete' && t.blocksDownstream && (
+                                <Tag type="magenta" title="Downstream tasks wait on this TCN">BLOCKS DOWNSTREAM</Tag>
+                              )}
+                              {t.status === 'complete' && '—'}
+                              {t.status !== 'complete' && !t.blockedByTcn && !t.blocksDownstream && '—'}
+                            </StructuredListCell>
+                            <StructuredListCell>
+                              <div style={{ minWidth: '190px' }}>
+                                <Dropdown
+                                  id={`tcn-status-${t.id}`}
+                                  titleText=""
+                                  label="Status"
+                                  size="sm"
+                                  items={WP_STATUSES}
+                                  itemToString={(s) => WP_STATUS_LABEL[s as string] ?? String(s)}
+                                  selectedItem={t.status}
+                                  disabled={statusMut.isPending}
+                                  onChange={({ selectedItem }) => {
+                                    if (selectedItem && selectedItem !== t.status) {
+                                      statusMut.mutate({ id: t.id, data: { status: selectedItem as WorkPackageTaskStatus, updatedBy: 'Production Control' } });
+                                    }
+                                  }}
+                                />
+                              </div>
+                            </StructuredListCell>
+                          </StructuredListRow>
+                        ))}
+                      </StructuredListBody>
+                    </StructuredListWrapper>
+                  </div>
+                ))
+              )}
             </div>
           </TabPanel>
 

@@ -25,6 +25,7 @@ import {
 } from "@workspace/mro-core";
 import { runPipeline, rebuildGraphReplace, rebuildGraphMerge } from "./service";
 import { dispatchExchange, ingestAcknowledgement } from "./exchange";
+import { ensureWorkPackagesSeeded } from "./work-packages";
 import { logger } from "../logger";
 
 const SEED_CLASSES_FULL: OntologyClass[] = SEED_CLASSES.map((c) => ({
@@ -52,6 +53,8 @@ async function doSeed(): Promise<void> {
     await ensureExchangeSeeded();
     await ensureLlpsSeeded();
     await ensureOntologySeedCurrent();
+    // Work packages for recommendations approved before the TCN feature.
+    await ensureWorkPackagesSeeded();
     // Merge (not replace) so any manual graph-node corrections survive restarts.
     await rebuildGraphMerge();
     return;
@@ -149,6 +152,7 @@ async function doSeed(): Promise<void> {
   // seed the sample OEM<->MRO shop-visit round-trip, then build the graph.
   await runPipeline(now);
   await ensureExchangeSeeded();
+  await ensureWorkPackagesSeeded();
   await rebuildGraphReplace();
   logger.info("Seeding complete");
 }
@@ -178,8 +182,32 @@ async function ensureOntologySeedCurrent(): Promise<void> {
         (c) => !classIds.has(c.id),
       );
       const missingRels = SEED_RELATIONSHIPS.filter((r) => !relIds.has(r.id));
-      if (missingClasses.length === 0 && missingRels.length === 0) continue;
-      const classes = [...row.classes, ...missingClasses];
+      // Additive attribute backfill: append seed attributes newly introduced on
+      // existing classes (e.g. MaintenanceTask.tcn), never touching SME-edited
+      // or renamed attributes.
+      const attributePatches = new Map<string, OntologyClass["attributes"]>();
+      for (const seedClass of SEED_CLASSES_FULL) {
+        const current = row.classes.find((c) => c.id === seedClass.id);
+        if (!current) continue;
+        const names = new Set(current.attributes.map((a) => a.name));
+        const missingAttrs = seedClass.attributes.filter(
+          (a) => !names.has(a.name),
+        );
+        if (missingAttrs.length > 0) {
+          attributePatches.set(seedClass.id, missingAttrs);
+        }
+      }
+      if (
+        missingClasses.length === 0 &&
+        missingRels.length === 0 &&
+        attributePatches.size === 0
+      )
+        continue;
+      const patched = row.classes.map((c) => {
+        const extra = attributePatches.get(c.id);
+        return extra ? { ...c, attributes: [...c.attributes, ...extra] } : c;
+      });
+      const classes = [...patched, ...missingClasses];
       const relationships = [...row.relationships, ...missingRels];
       const turtle = serializeToTurtle({
         version: row.version,
@@ -197,6 +225,7 @@ async function ensureOntologySeedCurrent(): Promise<void> {
           version: row.version,
           addedClasses: missingClasses.map((c) => c.id),
           addedRelationships: missingRels.map((r) => r.id),
+          patchedAttributeClasses: [...attributePatches.keys()],
         },
         "Backfilled seed ontology additions",
       );

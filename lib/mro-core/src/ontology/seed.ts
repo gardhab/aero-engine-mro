@@ -123,6 +123,16 @@ export const SEED_CLASSES: Omit<
       { name: "ataCode", type: "string", description: "ATA chapter/task" },
       { name: "s1000dCode", type: "string", description: "S1000D task code" },
       { name: "skill", type: "string", description: "Required skill" },
+      {
+        name: "tcn",
+        type: "string",
+        description: "Task Control Number tracking shop-floor execution",
+      },
+      {
+        name: "status",
+        type: "string",
+        description: "Execution status (Not Started … Complete)",
+      },
     ],
   },
   {

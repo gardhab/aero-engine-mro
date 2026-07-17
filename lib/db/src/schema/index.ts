@@ -8,3 +8,4 @@ export * from "./ontology-versions";
 export * from "./backtest-runs";
 export * from "./activity";
 export * from "./llps";
+export * from "./work-package-tasks";

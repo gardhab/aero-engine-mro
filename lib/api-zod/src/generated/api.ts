@@ -53,7 +53,7 @@ export const GetDashboardSummaryResponse = zod.object({
 export const GetActivityResponseItem = zod.object({
   "id": zod.string(),
   "timestamp": zod.string(),
-  "type": zod.enum(['recommendation', 'approval', 'rejection', 'sap_push', 'pipeline', 'ontology', 'backtest', 'exchange']),
+  "type": zod.enum(['recommendation', 'approval', 'rejection', 'sap_push', 'pipeline', 'ontology', 'backtest', 'exchange', 'work_package']),
   "description": zod.string(),
   "engineId": zod.string().nullish(),
   "recommendationId": zod.string().nullish()
@@ -1063,6 +1063,95 @@ export const AdvanceExchangeResponse = zod.object({
   "sentAt": zod.string().nullable(),
   "acceptedAt": zod.string().nullable(),
   "releasedAt": zod.string().nullable()
+})
+
+
+/**
+ * @summary List TCN-tracked shop-visit work packages
+ */
+export const ListWorkPackagesQueryParams = zod.object({
+  "engineId": zod.coerce.string().optional(),
+  "recommendationId": zod.coerce.string().optional()
+})
+
+export const ListWorkPackagesResponseItem = zod.object({
+  "id": zod.string(),
+  "recommendationId": zod.string(),
+  "engineId": zod.string(),
+  "failureMode": zod.string(),
+  "component": zod.string(),
+  "status": zod.enum(['not_started', 'in_progress', 'complete']),
+  "taskCount": zod.number(),
+  "completedTaskCount": zod.number(),
+  "createdAt": zod.string(),
+  "tasks": zod.array(zod.object({
+  "id": zod.string(),
+  "tcn": zod.string().describe('Task Control Number (e.g. TCN-1001)'),
+  "workPackageId": zod.string(),
+  "recommendationId": zod.string(),
+  "engineId": zod.string(),
+  "module": zod.string(),
+  "sequence": zod.number(),
+  "description": zod.string(),
+  "ataCode": zod.string(),
+  "s1000dCode": zod.string().nullish(),
+  "skill": zod.string(),
+  "estimatedHours": zod.number(),
+  "status": zod.enum(['not_started', 'in_progress', 'awaiting_parts', 'awaiting_inspection', 'complete']),
+  "blockedByTcn": zod.string().nullish().describe('TCN of the earlier incomplete task this one waits on'),
+  "blocksDownstream": zod.boolean().describe('True when this incomplete task holds up later tasks'),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+export const ListWorkPackagesResponse = zod.array(ListWorkPackagesResponseItem)
+
+
+/**
+ * @summary Update the execution status of a TCN-tracked task
+ */
+export const UpdateWorkPackageTaskStatusParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateWorkPackageTaskStatusBody = zod.object({
+  "status": zod.enum(['not_started', 'in_progress', 'awaiting_parts', 'awaiting_inspection', 'complete']),
+  "updatedBy": zod.string().optional()
+})
+
+export const UpdateWorkPackageTaskStatusResponse = zod.object({
+  "id": zod.string(),
+  "recommendationId": zod.string(),
+  "engineId": zod.string(),
+  "failureMode": zod.string(),
+  "component": zod.string(),
+  "status": zod.enum(['not_started', 'in_progress', 'complete']),
+  "taskCount": zod.number(),
+  "completedTaskCount": zod.number(),
+  "createdAt": zod.string(),
+  "tasks": zod.array(zod.object({
+  "id": zod.string(),
+  "tcn": zod.string().describe('Task Control Number (e.g. TCN-1001)'),
+  "workPackageId": zod.string(),
+  "recommendationId": zod.string(),
+  "engineId": zod.string(),
+  "module": zod.string(),
+  "sequence": zod.number(),
+  "description": zod.string(),
+  "ataCode": zod.string(),
+  "s1000dCode": zod.string().nullish(),
+  "skill": zod.string(),
+  "estimatedHours": zod.number(),
+  "status": zod.enum(['not_started', 'in_progress', 'awaiting_parts', 'awaiting_inspection', 'complete']),
+  "blockedByTcn": zod.string().nullish().describe('TCN of the earlier incomplete task this one waits on'),
+  "blocksDownstream": zod.boolean().describe('True when this incomplete task holds up later tasks'),
+  "startedAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
 })
 
 

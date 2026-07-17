@@ -39,6 +39,7 @@ import type {
   HealthStatus,
   IngestAcknowledgementInput,
   ListRecommendationsParams,
+  ListWorkPackagesParams,
   NotFoundResponse,
   Ontology,
   OntologyClass,
@@ -61,7 +62,9 @@ import type {
   SapStatus,
   ShopVisitExchange,
   ShopVisitExchangeSummary,
-  ValidationFailedResponse
+  UpdateWorkPackageTaskStatusInput,
+  ValidationFailedResponse,
+  WorkPackage
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1684,6 +1687,162 @@ export const useAdvanceExchange = <TError = ErrorType<NotFoundResponse | Conflic
         TContext
       > => {
       return useMutation(getAdvanceExchangeMutationOptions(options));
+    }
+
+export const getListWorkPackagesUrl = (params?: ListWorkPackagesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/work-packages?${stringifiedParams}` : `/api/work-packages`
+}
+
+/**
+ * @summary List TCN-tracked shop-visit work packages
+ */
+export const listWorkPackages = async (params?: ListWorkPackagesParams, options?: RequestInit): Promise<WorkPackage[]> => {
+
+  return customFetch<WorkPackage[]>(getListWorkPackagesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWorkPackagesQueryKey = (params?: ListWorkPackagesParams,) => {
+    return [
+    `/api/work-packages`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListWorkPackagesQueryOptions = <TData = Awaited<ReturnType<typeof listWorkPackages>>, TError = ErrorType<unknown>>(params?: ListWorkPackagesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWorkPackages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWorkPackagesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWorkPackages>>> = ({ signal }) => listWorkPackages(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWorkPackages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListWorkPackagesQueryResult = NonNullable<Awaited<ReturnType<typeof listWorkPackages>>>
+export type ListWorkPackagesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List TCN-tracked shop-visit work packages
+ */
+
+export function useListWorkPackages<TData = Awaited<ReturnType<typeof listWorkPackages>>, TError = ErrorType<unknown>>(
+ params?: ListWorkPackagesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWorkPackages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListWorkPackagesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateWorkPackageTaskStatusUrl = (id: string,) => {
+
+
+
+
+  return `/api/work-package-tasks/${id}/status`
+}
+
+/**
+ * @summary Update the execution status of a TCN-tracked task
+ */
+export const updateWorkPackageTaskStatus = async (id: string,
+    updateWorkPackageTaskStatusInput: UpdateWorkPackageTaskStatusInput, options?: RequestInit): Promise<WorkPackage> => {
+
+  return customFetch<WorkPackage>(getUpdateWorkPackageTaskStatusUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateWorkPackageTaskStatusInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateWorkPackageTaskStatusMutationOptions = <TError = ErrorType<BadRequestResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkPackageTaskStatus>>, TError,{id: string;data: BodyType<UpdateWorkPackageTaskStatusInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateWorkPackageTaskStatus>>, TError,{id: string;data: BodyType<UpdateWorkPackageTaskStatusInput>}, TContext> => {
+
+const mutationKey = ['updateWorkPackageTaskStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWorkPackageTaskStatus>>, {id: string;data: BodyType<UpdateWorkPackageTaskStatusInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateWorkPackageTaskStatus(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateWorkPackageTaskStatusMutationResult = NonNullable<Awaited<ReturnType<typeof updateWorkPackageTaskStatus>>>
+    export type UpdateWorkPackageTaskStatusMutationBody = BodyType<UpdateWorkPackageTaskStatusInput>
+    export type UpdateWorkPackageTaskStatusMutationError = ErrorType<BadRequestResponse | NotFoundResponse>
+
+    /**
+ * @summary Update the execution status of a TCN-tracked task
+ */
+export const useUpdateWorkPackageTaskStatus = <TError = ErrorType<BadRequestResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWorkPackageTaskStatus>>, TError,{id: string;data: BodyType<UpdateWorkPackageTaskStatusInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateWorkPackageTaskStatus>>,
+        TError,
+        {id: string;data: BodyType<UpdateWorkPackageTaskStatusInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateWorkPackageTaskStatusMutationOptions(options));
     }
 
 export const getRunPipelineUrl = () => {

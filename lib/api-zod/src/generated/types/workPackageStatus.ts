@@ -6,17 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ActivityEventType = typeof ActivityEventType[keyof typeof ActivityEventType];
+export type WorkPackageStatus = typeof WorkPackageStatus[keyof typeof WorkPackageStatus];
 
 
-export const ActivityEventType = {
-  recommendation: 'recommendation',
-  approval: 'approval',
-  rejection: 'rejection',
-  sap_push: 'sap_push',
-  pipeline: 'pipeline',
-  ontology: 'ontology',
-  backtest: 'backtest',
-  exchange: 'exchange',
-  work_package: 'work_package',
+export const WorkPackageStatus = {
+  not_started: 'not_started',
+  in_progress: 'in_progress',
+  complete: 'complete',
 } as const;

@@ -757,6 +757,75 @@ export interface AdvanceExchangeInput {
   status: ExchangeStatus;
 }
 
+export type WorkPackageTaskStatus = typeof WorkPackageTaskStatus[keyof typeof WorkPackageTaskStatus];
+
+
+export const WorkPackageTaskStatus = {
+  not_started: 'not_started',
+  in_progress: 'in_progress',
+  awaiting_parts: 'awaiting_parts',
+  awaiting_inspection: 'awaiting_inspection',
+  complete: 'complete',
+} as const;
+
+export interface WorkPackageTask {
+  id: string;
+  /** Task Control Number (e.g. TCN-1001) */
+  tcn: string;
+  workPackageId: string;
+  recommendationId: string;
+  engineId: string;
+  module: string;
+  sequence: number;
+  description: string;
+  ataCode: string;
+  /** @nullable */
+  s1000dCode?: string | null;
+  skill: string;
+  estimatedHours: number;
+  status: WorkPackageTaskStatus;
+  /**
+     * TCN of the earlier incomplete task this one waits on
+     * @nullable
+     */
+  blockedByTcn?: string | null;
+  /** True when this incomplete task holds up later tasks */
+  blocksDownstream: boolean;
+  /** @nullable */
+  startedAt?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type WorkPackageStatus = typeof WorkPackageStatus[keyof typeof WorkPackageStatus];
+
+
+export const WorkPackageStatus = {
+  not_started: 'not_started',
+  in_progress: 'in_progress',
+  complete: 'complete',
+} as const;
+
+export interface WorkPackage {
+  id: string;
+  recommendationId: string;
+  engineId: string;
+  failureMode: string;
+  component: string;
+  status: WorkPackageStatus;
+  taskCount: number;
+  completedTaskCount: number;
+  createdAt: string;
+  tasks: WorkPackageTask[];
+}
+
+export interface UpdateWorkPackageTaskStatusInput {
+  status: WorkPackageTaskStatus;
+  updatedBy?: string;
+}
+
 export type ActivityEventType = typeof ActivityEventType[keyof typeof ActivityEventType];
 
 
@@ -769,6 +838,7 @@ export const ActivityEventType = {
   ontology: 'ontology',
   backtest: 'backtest',
   exchange: 'exchange',
+  work_package: 'work_package',
 } as const;
 
 export interface ActivityEvent {
@@ -888,6 +958,11 @@ parameter?: string;
 export type ListRecommendationsParams = {
 status?: RecommendationStatus;
 engineId?: string;
+};
+
+export type ListWorkPackagesParams = {
+engineId?: string;
+recommendationId?: string;
 };
 
 export type GetGraphParams = {

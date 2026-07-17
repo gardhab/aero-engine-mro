@@ -36,6 +36,10 @@ import {
 } from "@workspace/mro-core";
 import { getGraphStore } from "./graph";
 import {
+  ensureWorkPackageForRecommendation,
+  loadAllWorkPackageTasks,
+} from "./work-packages";
+import {
   toEngine,
   toEngineLlp,
   toReading,
@@ -53,19 +57,8 @@ export function getSapAdapter(): SapAdapter {
 
 const ACTIVE_STATUSES = ["pending", "approved", "pushed"] as const;
 
-export async function logActivity(
-  type: ActivityType,
-  description: string,
-  opts: { engineId?: string; recommendationId?: string } = {},
-): Promise<void> {
-  await db.insert(activityTable).values({
-    id: randomUUID(),
-    type,
-    description,
-    engineId: opts.engineId ?? null,
-    recommendationId: opts.recommendationId ?? null,
-  });
-}
+import { logActivity } from "./activity";
+export { logActivity };
 
 /** Recompute and persist an engine's health snapshot from its readings. */
 export async function recomputeEngine(esn: string): Promise<void> {
@@ -161,6 +154,10 @@ export async function runPipeline(now: Date = new Date()): Promise<PipelineResul
         `New ${rec.priority.toUpperCase()} recommendation for ${engine.esn}: ${rec.failureMode}`,
         { engineId: engine.esn, recommendationId: rec.id },
       );
+      // Auto-approved recommendations spawn their TCN work package immediately.
+      if (autoApproved) {
+        await ensureWorkPackageForRecommendation(rec);
+      }
     }
 
     // LLP remaining-life policy: if the engine's limiting part falls below the
@@ -267,13 +264,14 @@ export async function rebuildGraphReplace(): Promise<void> {
 
 /** Load and map everything the graph projection consumes, in parallel. */
 async function loadGraphInputs() {
-  const [engineRows, ruleRows, recRows, exchangeRows, llpRows] =
+  const [engineRows, ruleRows, recRows, exchangeRows, llpRows, wpTasks] =
     await Promise.all([
       db.select().from(enginesTable),
       db.select().from(rulesTable),
       db.select().from(recommendationsTable),
       db.select().from(shopVisitExchangesTable),
       db.select().from(llpsTable),
+      loadAllWorkPackageTasks(),
     ]);
   return [
     engineRows.map((e) => toEngine(e, 0)),
@@ -281,6 +279,7 @@ async function loadGraphInputs() {
     ruleRows.map(toRule),
     exchangeRows.map(toShopVisitExchange),
     llpRows.map(toEngineLlp),
+    wpTasks,
   ] as const;
 }
 

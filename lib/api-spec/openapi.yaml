@@ -434,6 +434,57 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
 
+  /work-packages:
+    get:
+      operationId: listWorkPackages
+      tags: [work-packages]
+      summary: List TCN-tracked shop-visit work packages
+      parameters:
+        - name: engineId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: recommendationId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Work packages with their TCN-numbered tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkPackage"
+
+  /work-package-tasks/{id}/status:
+    post:
+      operationId: updateWorkPackageTaskStatus
+      tags: [work-packages]
+      summary: Update the execution status of a TCN-tracked task
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkPackageTaskStatusInput"
+      responses:
+        "200":
+          description: The task's updated work package
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkPackage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /pipeline/run:
     post:
       operationId: runPipeline
@@ -1666,6 +1717,97 @@ components:
         status:
           $ref: "#/components/schemas/ExchangeStatus"
 
+    WorkPackageTaskStatus:
+      type: string
+      enum: [not_started, in_progress, awaiting_parts, awaiting_inspection, complete]
+
+    WorkPackageTask:
+      type: object
+      required:
+        [
+          id,
+          tcn,
+          workPackageId,
+          recommendationId,
+          engineId,
+          module,
+          sequence,
+          description,
+          ataCode,
+          skill,
+          estimatedHours,
+          status,
+          blocksDownstream,
+          createdAt,
+          updatedAt,
+        ]
+      properties:
+        id: { type: string }
+        tcn: { type: string, description: "Task Control Number (e.g. TCN-1001)" }
+        workPackageId: { type: string }
+        recommendationId: { type: string }
+        engineId: { type: string }
+        module: { type: string }
+        sequence: { type: integer }
+        description: { type: string }
+        ataCode: { type: string }
+        s1000dCode: { type: ["string", "null"] }
+        skill: { type: string }
+        estimatedHours: { type: number }
+        status:
+          $ref: "#/components/schemas/WorkPackageTaskStatus"
+        blockedByTcn:
+          type: ["string", "null"]
+          description: TCN of the earlier incomplete task this one waits on
+        blocksDownstream:
+          type: boolean
+          description: True when this incomplete task holds up later tasks
+        startedAt: { type: ["string", "null"] }
+        completedAt: { type: ["string", "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+
+    WorkPackage:
+      type: object
+      required:
+        [
+          id,
+          recommendationId,
+          engineId,
+          failureMode,
+          component,
+          status,
+          taskCount,
+          completedTaskCount,
+          createdAt,
+          tasks,
+        ]
+      properties:
+        id: { type: string }
+        recommendationId: { type: string }
+        engineId: { type: string }
+        failureMode: { type: string }
+        component: { type: string }
+        status:
+          type: string
+          enum: [not_started, in_progress, complete]
+        taskCount: { type: integer }
+        completedTaskCount: { type: integer }
+        createdAt: { type: string }
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkPackageTask"
+
+    UpdateWorkPackageTaskStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/WorkPackageTaskStatus"
+        updatedBy:
+          type: string
+
     ActivityEvent:
       type: object
       required: [id, timestamp, type, description]
@@ -1674,7 +1816,7 @@ components:
         timestamp: { type: string }
         type:
           type: string
-          enum: [recommendation, approval, rejection, sap_push, pipeline, ontology, backtest, exchange]
+          enum: [recommendation, approval, rejection, sap_push, pipeline, ontology, backtest, exchange, work_package]
         description: { type: string }
         engineId: { type: ["string", "null"] }
         recommendationId: { type: ["string", "null"] }
