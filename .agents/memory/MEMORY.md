@@ -1,3 +1,3 @@
 - [Kùzu on Nix + pnpm](kuzu-on-nix.md) — native graph module works, but needs onlyBuiltDependencies allowlist + esbuild external + a possibly-manual install.js prebuild.
 - [Carbon Sass theme config](carbon-theme-config.md) — pass the theme map `themes.$g10`, not the string `'g10'`; `$use-font-face`/`$font-path` are not overridable in the installed version.
-- [Graph projection migrations](graph-projection-migrations.md) — graph merge never deletes: retargeted edges need an explicit prune; ontology restructures migrate via rename maps to keep SME edits.
+- [Graph projection migrations](graph-projection-migrations.md) — graph merge never deletes: retargeted/relabeled edges need an explicit prune (merge does refresh non-corrected node types/props in place); ontology restructures migrate via rename maps to keep SME edits.

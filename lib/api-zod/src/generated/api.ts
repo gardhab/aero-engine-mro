@@ -646,6 +646,16 @@ export const DispatchRecommendationResponse = zod.object({
 }),zod.null()])
 })
 }),
+  "complianceAssessments": zod.array(zod.object({
+  "reference": zod.string(),
+  "category": zod.string(),
+  "status": zod.enum(['compliant', 'due', 'overdue', 'not_applicable', 'pending_evidence']),
+  "deadline": zod.string().nullable(),
+  "assessedAt": zod.string(),
+  "engineId": zod.string(),
+  "recommendationId": zod.string().nullable(),
+  "evidenceTcns": zod.array(zod.string())
+})),
   "requestXml": zod.string(),
   "acknowledgement": zod.union([zod.object({
   "documentId": zod.string(),
@@ -733,6 +743,16 @@ export const GetRecommendationExchangeResponse = zod.object({
 }),zod.null()])
 })
 }),
+  "complianceAssessments": zod.array(zod.object({
+  "reference": zod.string(),
+  "category": zod.string(),
+  "status": zod.enum(['compliant', 'due', 'overdue', 'not_applicable', 'pending_evidence']),
+  "deadline": zod.string().nullable(),
+  "assessedAt": zod.string(),
+  "engineId": zod.string(),
+  "recommendationId": zod.string().nullable(),
+  "evidenceTcns": zod.array(zod.string())
+})),
   "requestXml": zod.string(),
   "acknowledgement": zod.union([zod.object({
   "documentId": zod.string(),
@@ -847,6 +867,16 @@ export const GetExchangeResponse = zod.object({
 }),zod.null()])
 })
 }),
+  "complianceAssessments": zod.array(zod.object({
+  "reference": zod.string(),
+  "category": zod.string(),
+  "status": zod.enum(['compliant', 'due', 'overdue', 'not_applicable', 'pending_evidence']),
+  "deadline": zod.string().nullable(),
+  "assessedAt": zod.string(),
+  "engineId": zod.string(),
+  "recommendationId": zod.string().nullable(),
+  "evidenceTcns": zod.array(zod.string())
+})),
   "requestXml": zod.string(),
   "acknowledgement": zod.union([zod.object({
   "documentId": zod.string(),
@@ -939,6 +969,16 @@ export const IngestAcknowledgementResponse = zod.object({
 }),zod.null()])
 })
 }),
+  "complianceAssessments": zod.array(zod.object({
+  "reference": zod.string(),
+  "category": zod.string(),
+  "status": zod.enum(['compliant', 'due', 'overdue', 'not_applicable', 'pending_evidence']),
+  "deadline": zod.string().nullable(),
+  "assessedAt": zod.string(),
+  "engineId": zod.string(),
+  "recommendationId": zod.string().nullable(),
+  "evidenceTcns": zod.array(zod.string())
+})),
   "requestXml": zod.string(),
   "acknowledgement": zod.union([zod.object({
   "documentId": zod.string(),
@@ -1030,6 +1070,16 @@ export const AdvanceExchangeResponse = zod.object({
 }),zod.null()])
 })
 }),
+  "complianceAssessments": zod.array(zod.object({
+  "reference": zod.string(),
+  "category": zod.string(),
+  "status": zod.enum(['compliant', 'due', 'overdue', 'not_applicable', 'pending_evidence']),
+  "deadline": zod.string().nullable(),
+  "assessedAt": zod.string(),
+  "engineId": zod.string(),
+  "recommendationId": zod.string().nullable(),
+  "evidenceTcns": zod.array(zod.string())
+})),
   "requestXml": zod.string(),
   "acknowledgement": zod.union([zod.object({
   "documentId": zod.string(),

@@ -12,9 +12,58 @@ import { Save } from '@carbon/icons-react';
 import ReactFlow, { Background, Controls, MiniMap, MarkerType, useNodesState, useEdgesState } from 'reactflow';
 import { useQueryClient } from '@tanstack/react-query';
 
+/**
+ * Node styling per ontology class. Lifecycle-event classes (ShopVisit,
+ * WorkOrder, MaintenanceTaskExecution, MeasurementObservation,
+ * ComplianceAssessment) share a warm palette so time-bound events read
+ * distinctly from structural/design nodes.
+ */
+const NODE_STYLE: Record<string, { background: string; color: string; group: 'asset' | 'event' | 'compliance' | 'other' }> = {
+  Engine: { background: '#0f62fe', color: '#fff', group: 'asset' },
+  EngineModule: { background: '#d0e2ff', color: '#161616', group: 'asset' },
+  Component: { background: '#8a3ffc', color: '#fff', group: 'asset' },
+  LifeLimitedPart: { background: '#8a3ffc', color: '#fff', group: 'asset' },
+  PiecePart: { background: '#e8daff', color: '#161616', group: 'asset' },
+  // Lifecycle events
+  ShopVisit: { background: '#ff832b', color: '#161616', group: 'event' },
+  WorkOrder: { background: '#ffb784', color: '#161616', group: 'event' },
+  MaintenanceTaskExecution: { background: '#fff1e5', color: '#161616', group: 'event' },
+  MeasurementObservation: { background: '#fcf4d6', color: '#161616', group: 'event' },
+  // Compliance
+  ComplianceDirective: { background: '#da1e28', color: '#fff', group: 'compliance' },
+  ComplianceAssessment: { background: '#ffd7d9', color: '#161616', group: 'compliance' },
+  MaintenanceRecommendation: { background: '#24a148', color: '#fff', group: 'other' },
+};
+
+const LEGEND: { label: string; types: string[]; color: string }[] = [
+  { label: 'Engine / structure', types: ['Engine', 'EngineModule', 'Component'], color: '#0f62fe' },
+  { label: 'Shop visit', types: ['ShopVisit'], color: '#ff832b' },
+  { label: 'Work order', types: ['WorkOrder'], color: '#ffb784' },
+  { label: 'Task execution', types: ['MaintenanceTaskExecution'], color: '#fff1e5' },
+  { label: 'Measurement', types: ['MeasurementObservation'], color: '#fcf4d6' },
+  { label: 'Directive', types: ['ComplianceDirective'], color: '#da1e28' },
+  { label: 'Compliance assessment', types: ['ComplianceAssessment'], color: '#ffd7d9' },
+  { label: 'Recommendation', types: ['MaintenanceRecommendation'], color: '#24a148' },
+];
+
+const TYPE_FILTER_OPTIONS = [
+  'All types',
+  'Engine',
+  'ShopVisit',
+  'WorkOrder',
+  'MaintenanceTaskExecution',
+  'MeasurementObservation',
+  'ComplianceDirective',
+  'ComplianceAssessment',
+  'MaintenanceRecommendation',
+  'ServiceRequest',
+  'LifeLimitedPart',
+];
+
 export default function GraphExplorer() {
   const [engineFilter, setEngineFilter] = useState<string>('');
-  
+  const [typeFilter, setTypeFilter] = useState<string>('All types');
+
   // Use debounced value for query to avoid spamming
   const [debouncedFilter, setDebouncedFilter] = useState('');
   React.useEffect(() => {
@@ -23,7 +72,12 @@ export default function GraphExplorer() {
   }, [engineFilter]);
 
   const { data: graphData, isLoading } = useGetGraph(
-    debouncedFilter ? { engineId: debouncedFilter } : undefined
+    debouncedFilter || typeFilter !== 'All types'
+      ? {
+          ...(debouncedFilter ? { engineId: debouncedFilter } : {}),
+          ...(typeFilter !== 'All types' ? { type: typeFilter } : {}),
+        }
+      : undefined
   );
   
   const updateNode = useUpdateGraphNode();
@@ -44,13 +98,14 @@ export default function GraphExplorer() {
       const nodesOfThisType = graphData.nodes.filter(x => x.type === n.type);
       const myIndexInType = nodesOfThisType.findIndex(x => x.id === n.id);
       
+      const styleDef = NODE_STYLE[n.type];
       return {
         id: n.id,
         position: { x: typeIndex * 300, y: myIndexInType * 100 },
         data: { label: `${n.label}\n(${n.type})`, fullNode: n },
         style: {
-          background: n.type === 'Engine' ? '#0f62fe' : n.type === 'Component' ? '#8a3ffc' : '#ffffff',
-          color: (n.type === 'Engine' || n.type === 'Component') ? '#fff' : '#161616',
+          background: styleDef?.background ?? '#ffffff',
+          color: styleDef?.color ?? '#161616',
           border: '1px solid #8d8d8d',
           borderRadius: '2px',
           padding: '10px',
@@ -102,15 +157,36 @@ export default function GraphExplorer() {
           <h1 className="mb-1">Knowledge Graph Explorer</h1>
           <p>Explore instance data and relationships.</p>
         </div>
-        <div style={{ width: '300px' }}>
-          <TextInput
-            id="engine-filter"
-            labelText="Filter Subgraph by ESN"
-            placeholder="e.g. ESN-1001"
-            value={engineFilter}
-            onChange={(e) => setEngineFilter(e.target.value)}
-          />
+        <div className="flex gap-4 items-end">
+          <div style={{ width: '260px' }}>
+            <Dropdown
+              id="type-filter"
+              titleText="Filter by Node Type"
+              label="All types"
+              items={TYPE_FILTER_OPTIONS}
+              selectedItem={typeFilter}
+              onChange={({ selectedItem }) => setTypeFilter(selectedItem ?? 'All types')}
+            />
+          </div>
+          <div style={{ width: '260px' }}>
+            <TextInput
+              id="engine-filter"
+              labelText="Filter Subgraph by ESN"
+              placeholder="e.g. ESN-1001"
+              value={engineFilter}
+              onChange={(e) => setEngineFilter(e.target.value)}
+            />
+          </div>
         </div>
+      </div>
+
+      <div className="flex gap-4 items-center mb-2 shrink-0" style={{ flexWrap: 'wrap' }}>
+        {LEGEND.map((item) => (
+          <span key={item.label} className="flex gap-1 items-center" style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary)' }}>
+            <span style={{ width: 12, height: 12, background: item.color, border: '1px solid #8d8d8d', borderRadius: 2, display: 'inline-block' }} />
+            {item.label}
+          </span>
+        ))}
       </div>
 
       <div className="flex-1 flex gap-4 min-h-0">

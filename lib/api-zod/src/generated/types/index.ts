@@ -17,6 +17,8 @@ export * from './backtestResultRowOutcome';
 export * from './backtestRun';
 export * from './badRequestResponse';
 export * from './bottleneckAlert';
+export * from './complianceAssessmentItem';
+export * from './complianceAssessmentItemStatus';
 export * from './complianceDirectiveItem';
 export * from './conflictResponse';
 export * from './dashboardPriorityCounts';

@@ -40,6 +40,14 @@ const STATUS_LABEL: Record<string, string> = {
   rejected: 'Rejected',
 };
 
+const COMPLIANCE_TAG: Record<string, { type: 'green' | 'blue' | 'red' | 'gray' | 'cool-gray'; label: string }> = {
+  compliant: { type: 'green', label: 'Compliant' },
+  due: { type: 'blue', label: 'Due' },
+  overdue: { type: 'red', label: 'Overdue' },
+  not_applicable: { type: 'cool-gray', label: 'Not applicable' },
+  pending_evidence: { type: 'gray', label: 'Pending evidence' },
+};
+
 function ExchangeDetailModal({ id, onClose }: { id: string; onClose: () => void }) {
   const { data: ex, isLoading } = useGetExchange(id);
 
@@ -120,11 +128,14 @@ function ExchangeDetailModal({ id, onClose }: { id: string; onClose: () => void 
                     <StructuredListCell head>Category</StructuredListCell>
                     <StructuredListCell head>Description</StructuredListCell>
                     <StructuredListCell head>Feasibility</StructuredListCell>
+                    <StructuredListCell head>Compliance</StructuredListCell>
                   </StructuredListRow>
                 </StructuredListHead>
                 <StructuredListBody>
                   {ex.request.workScope.complianceDirectives.map((c) => {
                     const fb = ex.acknowledgement?.feasibility.find((f) => f.reference === c.reference);
+                    const assessment = ex.complianceAssessments?.find((a) => a.reference === c.reference);
+                    const compliance = assessment ? COMPLIANCE_TAG[assessment.status] : undefined;
                     return (
                       <StructuredListRow key={c.reference}>
                         <StructuredListCell>{c.reference}</StructuredListCell>
@@ -134,6 +145,13 @@ function ExchangeDetailModal({ id, onClose }: { id: string; onClose: () => void 
                           {fb ? (
                             <Tag type={fb.feasible ? 'green' : 'red'}>
                               {fb.feasible ? 'Feasible' : 'Not feasible'}
+                            </Tag>
+                          ) : '—'}
+                        </StructuredListCell>
+                        <StructuredListCell>
+                          {compliance ? (
+                            <Tag type={compliance.type} title={assessment?.evidenceTcns.length ? `Evidence: ${assessment.evidenceTcns.join(', ')}` : undefined}>
+                              {compliance.label}
                             </Tag>
                           ) : '—'}
                         </StructuredListCell>

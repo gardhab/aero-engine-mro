@@ -613,6 +613,30 @@ export interface ComplianceDirectiveItem {
   description: string;
 }
 
+export type ComplianceAssessmentItemStatus = typeof ComplianceAssessmentItemStatus[keyof typeof ComplianceAssessmentItemStatus];
+
+
+export const ComplianceAssessmentItemStatus = {
+  compliant: 'compliant',
+  due: 'due',
+  overdue: 'overdue',
+  not_applicable: 'not_applicable',
+  pending_evidence: 'pending_evidence',
+} as const;
+
+export interface ComplianceAssessmentItem {
+  reference: string;
+  category: string;
+  status: ComplianceAssessmentItemStatus;
+  /** @nullable */
+  deadline: string | null;
+  assessedAt: string;
+  engineId: string;
+  /** @nullable */
+  recommendationId: string | null;
+  evidenceTcns: string[];
+}
+
 export interface MaterialPolicy {
   partsSupply: string;
   materialClass: string;
@@ -706,6 +730,7 @@ export interface ShopVisitExchange {
   status: ExchangeStatus;
   documentId: string;
   request: EngineServiceRequest;
+  complianceAssessments: ComplianceAssessmentItem[];
   requestXml: string;
   acknowledgement: InductionAcceptance | null;
   targetTatDays: number;

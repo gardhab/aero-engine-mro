@@ -96,8 +96,12 @@ export interface InductionAcceptance {
   signedAt: string | null;
 }
 
+import type { ComplianceAssessment } from "../compliance.js";
+
 /** A persisted shop-visit exchange tying a recommendation to its TSR + response. */
 export interface ShopVisitExchange {
+  /** Derived, evidence-linked compliance assessments (API enrichment). */
+  complianceAssessments?: ComplianceAssessment[];
   id: string;
   recommendationId: string;
   engineId: string;

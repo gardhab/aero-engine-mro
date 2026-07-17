@@ -12,6 +12,7 @@ import type { EngineLlp } from "../llp.js";
 import type { WorkPackageTask } from "../work-package.js";
 import { PARAMETERS, PARAMETER_BY_CODE } from "../data/parameters.js";
 import { piecePartsForComponent } from "../data/piece-parts.js";
+import { deriveComplianceStatus } from "../compliance.js";
 
 export interface GraphFilter {
   engineId?: string;
@@ -32,6 +33,8 @@ export function buildGraph(
   workPackageTasks: WorkPackageTask[] = [],
   /** Latest reading per engine+parameter, projected as MeasurementObservations. */
   latestReadings: ParameterReading[] = [],
+  /** Assessment time for derived compliance statuses. */
+  now: Date = new Date(),
 ): GraphData {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
@@ -89,6 +92,13 @@ export function buildGraph(
       source: `sensor:${r.parameter}`,
       target: obsIdOf(r.engineId, r.parameter),
       label: "produces",
+    });
+    // Dated event linkage: an observation is recorded ON an engine.
+    addEdge({
+      id: `e:${r.parameter}:${r.engineId}:observedOn`,
+      source: obsIdOf(r.engineId, r.parameter),
+      target: `engine:${r.engineId}`,
+      label: "observedOn",
     });
   }
 
@@ -366,31 +376,82 @@ export function buildGraph(
     }
   }
 
-  // TCN-tracked work-package tasks: MaintenanceTask instances spawned from an
-  // approved recommendation, carrying their Task Control Number and status.
+  // TCN-tracked work-package tasks: lifecycle events. Each task row becomes a
+  // MaintenanceTaskExecution (the performed instance, with timestamps and
+  // status), grouped under a WorkOrder container that implements the source
+  // recommendation.
+  const tasksByPackage = new Map<string, WorkPackageTask[]>();
+  const tasksByRecommendation = new Map<string, WorkPackageTask[]>();
   for (const t of workPackageTasks) {
-    const taskId = `tcn:${t.tcn}`;
+    const pkg = tasksByPackage.get(t.workPackageId) ?? [];
+    pkg.push(t);
+    tasksByPackage.set(t.workPackageId, pkg);
+    const byRec = tasksByRecommendation.get(t.recommendationId) ?? [];
+    byRec.push(t);
+    tasksByRecommendation.set(t.recommendationId, byRec);
+  }
+  const workOrderIdsByRecommendation = new Map<string, string[]>();
+  for (const [workPackageId, tasks] of tasksByPackage) {
+    const ordered = [...tasks].sort((a, b) => a.sequence - b.sequence);
+    const recommendationId = ordered[0].recommendationId;
+    const engineId = ordered[0].engineId;
+    const statuses = ordered.map((t) => t.status);
+    const rollup = statuses.every((s) => s === "complete")
+      ? "complete"
+      : statuses.every((s) => s === "not_started")
+        ? "not_started"
+        : "in_progress";
+    const woId = `wo:${workPackageId}`;
     addNode({
-      id: taskId,
-      type: "MaintenanceTaskDefinition",
-      label: `${t.tcn} · ${t.ataCode}`,
+      id: woId,
+      type: "WorkOrder",
+      label: `Work order · ${engineId}`,
       properties: {
-        engineId: t.engineId,
-        tcn: t.tcn,
-        status: t.status,
-        ataCode: t.ataCode,
-        s1000dCode: t.s1000dCode ?? null,
-        skill: t.skill,
-        module: t.module,
-        sequence: t.sequence,
+        engineId,
+        workPackageId,
+        recommendationId,
+        status: rollup,
+        taskCount: ordered.length,
+        openedAt: ordered
+          .map((t) => t.createdAt)
+          .sort()[0],
       },
     });
-    if (nodeIds.has(`rec:${t.recommendationId}`)) {
+    const list = workOrderIdsByRecommendation.get(recommendationId) ?? [];
+    list.push(woId);
+    workOrderIdsByRecommendation.set(recommendationId, list);
+    if (nodeIds.has(`rec:${recommendationId}`)) {
       addEdge({
-        id: `e:${t.recommendationId}:${t.tcn}:recommends`,
-        source: `rec:${t.recommendationId}`,
+        id: `e:${workPackageId}:implementsRecommendation`,
+        source: woId,
+        target: `rec:${recommendationId}`,
+        label: "implementsRecommendation",
+      });
+    }
+    for (const t of ordered) {
+      const taskId = `tcn:${t.tcn}`;
+      addNode({
+        id: taskId,
+        type: "MaintenanceTaskExecution",
+        label: `${t.tcn} · ${t.ataCode}`,
+        properties: {
+          engineId: t.engineId,
+          tcn: t.tcn,
+          status: t.status,
+          ataCode: t.ataCode,
+          s1000dCode: t.s1000dCode ?? null,
+          skill: t.skill,
+          module: t.module,
+          sequence: t.sequence,
+          startedAt: t.startedAt ?? null,
+          completedAt: t.completedAt ?? null,
+        },
+      });
+      addEdge({
+        id: `e:${workPackageId}:${t.tcn}:hasTaskExecution`,
+        source: woId,
         target: taskId,
-        label: "recommends",
+        label: "hasTaskExecution",
       });
     }
   }
@@ -442,6 +503,132 @@ export function buildGraph(
         label: "mandates",
       });
     }
+    // Shop visit: the induction-to-release lifecycle event behind the exchange.
+    const visitId = `visit:${ex.id}`;
+    const visitStatus =
+      ex.status === "released"
+        ? "released"
+        : ex.status === "in_work"
+          ? "in_work"
+          : ex.status === "accepted"
+            ? "inducted"
+            : ex.status === "rejected"
+              ? "cancelled"
+              : "planned";
+    addNode({
+      id: visitId,
+      type: "ShopVisit",
+      label: `Shop visit · ${ex.engineId}${ex.shopOrder ? ` · ${ex.shopOrder}` : ""}`,
+      properties: {
+        engineId: ex.engineId,
+        shopOrder: ex.shopOrder,
+        mroProvider: ex.mroProvider,
+        status: visitStatus,
+        inductionDate: ex.acceptedAt,
+        releaseDate: ex.releasedAt,
+      },
+    });
+    if (nodeIds.has(`engine:${ex.engineId}`)) {
+      addEdge({
+        id: `e:${ex.id}:visitOf`,
+        source: visitId,
+        target: `engine:${ex.engineId}`,
+        label: "visitOf",
+      });
+    }
+    addEdge({
+      id: `e:${ex.id}:initiatedBy`,
+      source: visitId,
+      target: tsrId,
+      label: "initiatedBy",
+    });
+    for (const woId of workOrderIdsByRecommendation.get(ex.recommendationId) ??
+      []) {
+      addEdge({
+        id: `e:${ex.id}:${woId}:hasWorkOrder`,
+        source: visitId,
+        target: woId,
+        label: "hasWorkOrder",
+      });
+    }
+
+    // Computable compliance: per mandated directive, an evidence-linked
+    // assessment derived from the live recommendation / execution state.
+    const rec = recommendations.find((r) => r.id === ex.recommendationId);
+    const evidenceTasks = tasksByRecommendation.get(ex.recommendationId) ?? [];
+    const deadline = ex.request.workScope.targetReleaseDate ?? null;
+    for (const dir of ex.request.workScope.complianceDirectives) {
+      const cId = `compliance:${slug(dir.reference)}`;
+      const status = deriveComplianceStatus({
+        deadline,
+        recommendationStatus: rec?.status ?? null,
+        taskStatuses: evidenceTasks.map((t) => t.status),
+        exchangeStatus: ex.status,
+        now,
+      });
+      // Enrich the directive node with computable compliance attributes.
+      const dirNode = nodes.find((n) => n.id === cId);
+      if (dirNode) {
+        dirNode.properties.complianceDeadline = deadline;
+        dirNode.properties.complianceStatus = status;
+      }
+      addEdge({
+        id: `e:${slug(dir.reference)}:${ex.engineId}:directiveAppliesTo`,
+        source: cId,
+        target: `engine:${ex.engineId}`,
+        label: "directiveAppliesTo",
+      });
+      if (nodeIds.has(`rec:${ex.recommendationId}`)) {
+        addEdge({
+          id: `e:${slug(dir.reference)}:${ex.recommendationId}:requiresTask`,
+          source: cId,
+          target: `rec:${ex.recommendationId}`,
+          label: "requiresTask",
+        });
+      }
+      const assessmentId = `assessment:${ex.id}:${slug(dir.reference)}`;
+      addNode({
+        id: assessmentId,
+        type: "ComplianceAssessment",
+        label: `${dir.reference} · ${ex.engineId} · ${status}`,
+        properties: {
+          engineId: ex.engineId,
+          reference: dir.reference,
+          status,
+          deadline,
+          assessedAt: now.toISOString(),
+        },
+      });
+      addEdge({
+        id: `e:${assessmentId}:assesses`,
+        source: assessmentId,
+        target: cId,
+        label: "assesses",
+      });
+      addEdge({
+        id: `e:${assessmentId}:assessedFor`,
+        source: assessmentId,
+        target: `engine:${ex.engineId}`,
+        label: "assessedFor",
+      });
+      if (nodeIds.has(`rec:${ex.recommendationId}`)) {
+        addEdge({
+          id: `e:${assessmentId}:supportedByRecommendation`,
+          source: assessmentId,
+          target: `rec:${ex.recommendationId}`,
+          label: "supportedByRecommendation",
+        });
+      }
+      for (const t of evidenceTasks) {
+        addEdge({
+          id: `e:${assessmentId}:${t.tcn}:supportedByExecution`,
+          source: assessmentId,
+          target: `tcn:${t.tcn}`,
+          label: "supportedByExecution",
+        });
+      }
+    }
+
     if (ex.acknowledgement) {
       const commitId = `commitment:${ex.id}`;
       addNode({
@@ -515,6 +702,25 @@ export function supersededSensorEdgeIds(data: GraphData): string[] {
       }
       return false;
     })
+    .map((e) => e.id);
+}
+
+/**
+ * Superseded lifecycle edges: TCN nodes were re-typed from
+ * MaintenanceTaskDefinition to MaintenanceTaskExecution, and the direct
+ * `recommends` edge (rec → tcn) was replaced by the WorkOrder chain
+ * (WorkOrder implementsRecommendation / hasTaskExecution). Merge never
+ * deletes, so pre-migration `recommends` edges pointing at task executions
+ * must be pruned explicitly.
+ */
+export function supersededLifecycleEdgeIds(data: GraphData): string[] {
+  const typeById = new Map(data.nodes.map((n) => [n.id, n.type]));
+  return data.edges
+    .filter(
+      (e) =>
+        e.label === "recommends" &&
+        typeById.get(e.target) === "MaintenanceTaskExecution",
+    )
     .map((e) => e.id);
 }
 

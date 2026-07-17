@@ -1616,6 +1616,23 @@ components:
         category: { type: string }
         description: { type: string }
 
+    ComplianceAssessmentItem:
+      type: object
+      required: [reference, category, status, deadline, assessedAt, engineId, recommendationId, evidenceTcns]
+      properties:
+        reference: { type: string }
+        category: { type: string }
+        status:
+          type: string
+          enum: [compliant, due, overdue, not_applicable, pending_evidence]
+        deadline: { type: ["string", "null"] }
+        assessedAt: { type: string }
+        engineId: { type: string }
+        recommendationId: { type: ["string", "null"] }
+        evidenceTcns:
+          type: array
+          items: { type: string }
+
     MaterialPolicy:
       type: object
       required: [partsSupply, materialClass, scrapPolicy]
@@ -1716,7 +1733,7 @@ components:
 
     ShopVisitExchange:
       type: object
-      required: [id, recommendationId, engineId, engineModel, tailNumber, mroProvider, status, documentId, request, requestXml, acknowledgement, targetTatDays, committedTatDays, tatDeviationDays, shopOrder, unscheduledCostCapUsd, createdAt, updatedAt, sentAt, acceptedAt, releasedAt]
+      required: [id, recommendationId, engineId, engineModel, tailNumber, mroProvider, status, documentId, request, requestXml, acknowledgement, targetTatDays, committedTatDays, tatDeviationDays, shopOrder, unscheduledCostCapUsd, createdAt, updatedAt, sentAt, acceptedAt, releasedAt, complianceAssessments]
       properties:
         id: { type: string }
         recommendationId: { type: string }
@@ -1729,6 +1746,10 @@ components:
         documentId: { type: string }
         request:
           $ref: "#/components/schemas/EngineServiceRequest"
+        complianceAssessments:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComplianceAssessmentItem"
         requestXml: { type: string }
         acknowledgement:
           oneOf:

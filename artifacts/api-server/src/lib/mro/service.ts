@@ -27,6 +27,7 @@ import {
   nodeCountByClass,
   relevantLlpsForModules,
   resolveSapConfig,
+  supersededLifecycleEdgeIds,
   supersededSensorEdgeIds,
   toLifeLimitedParts,
   type ActivityType,
@@ -267,10 +268,14 @@ export async function rebuildGraphMerge(): Promise<void> {
  */
 async function pruneSupersededDiagnosticEdges(): Promise<void> {
   const store = await getGraphStore();
-  const stale = supersededSensorEdgeIds(await store.getGraph());
+  const graph = await store.getGraph();
+  const stale = [
+    ...supersededSensorEdgeIds(graph),
+    ...supersededLifecycleEdgeIds(graph),
+  ];
   if (stale.length > 0) {
     await store.deleteEdges(stale);
-    logger.info({ removed: stale.length }, "Pruned superseded sensor-level diagnostic edges");
+    logger.info({ removed: stale.length }, "Pruned superseded projection edges");
   }
 }
 
