@@ -21,6 +21,8 @@ import {
   generateLlpSheet,
   generateReadings,
   serializeToTurtle,
+  normalizeRelationships,
+  isValidMultiplicity,
   type OntologyClass,
 } from "@workspace/mro-core";
 import { runPipeline, rebuildGraphReplace, rebuildGraphMerge } from "./service";
@@ -203,10 +205,18 @@ async function ensureOntologySeedCurrent(): Promise<void> {
           attributePatches.set(seedClass.id, missingAttrs);
         }
       }
+      // Backfill both-end multiplicities on relationships stored before they
+      // became part of the ontology model.
+      const needsMultiplicityBackfill = row.relationships.some(
+        (r) =>
+          !isValidMultiplicity(r.sourceMultiplicity) ||
+          !isValidMultiplicity(r.targetMultiplicity),
+      );
       if (
         missingClasses.length === 0 &&
         missingRels.length === 0 &&
-        attributePatches.size === 0
+        attributePatches.size === 0 &&
+        !needsMultiplicityBackfill
       )
         continue;
       const patched = row.classes.map((c) => {
@@ -214,7 +224,10 @@ async function ensureOntologySeedCurrent(): Promise<void> {
         return extra ? { ...c, attributes: [...c.attributes, ...extra] } : c;
       });
       const classes = [...patched, ...missingClasses];
-      const relationships = [...row.relationships, ...missingRels];
+      const relationships = [
+        ...normalizeRelationships(row.relationships),
+        ...missingRels,
+      ];
       const turtle = serializeToTurtle({
         version: row.version,
         status: row.status === "published" ? "published" : "draft",

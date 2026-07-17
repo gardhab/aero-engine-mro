@@ -8,11 +8,16 @@
 
 export interface OntologyRelationship {
   id: string;
+  /** Directional verb name read domain → range */
   label: string;
   /** Source class id */
   domain: string;
   /** Target class id */
   range: string;
+  /** Multiplicity at the domain (source) end, e.g. 1, 0..*, 1..* */
+  sourceMultiplicity: string;
+  /** Multiplicity at the range (target) end, e.g. 1, 0..*, 1..* */
+  targetMultiplicity: string;
   /** @nullable */
   description?: string | null;
   deprecated: boolean;

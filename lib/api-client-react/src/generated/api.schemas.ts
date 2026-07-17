@@ -397,11 +397,16 @@ export interface OntologyClassUpdate {
 
 export interface OntologyRelationship {
   id: string;
+  /** Directional verb name read domain → range */
   label: string;
   /** Source class id */
   domain: string;
   /** Target class id */
   range: string;
+  /** Multiplicity at the domain (source) end, e.g. 1, 0..*, 1..* */
+  sourceMultiplicity: string;
+  /** Multiplicity at the range (target) end, e.g. 1, 0..*, 1..* */
+  targetMultiplicity: string;
   /** @nullable */
   description?: string | null;
   deprecated: boolean;
@@ -412,7 +417,22 @@ export interface OntologyRelationshipInput {
   label: string;
   domain: string;
   range: string;
+  /** @minLength 1 */
+  sourceMultiplicity: string;
+  /** @minLength 1 */
+  targetMultiplicity: string;
   description?: string;
+}
+
+export interface OntologyRelationshipUpdate {
+  /** @minLength 1 */
+  label?: string;
+  /** @minLength 1 */
+  sourceMultiplicity?: string;
+  /** @minLength 1 */
+  targetMultiplicity?: string;
+  description?: string;
+  deprecated?: boolean;
 }
 
 export type OntologyStatus = typeof OntologyStatus[keyof typeof OntologyStatus];

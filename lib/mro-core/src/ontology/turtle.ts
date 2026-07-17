@@ -65,6 +65,10 @@ export function serializeToTurtle(ontology: Ontology): string {
     lines.push(`    rdfs:label "${esc(rel.label)}" ;`);
     lines.push(`    rdfs:domain mro:${rel.domain} ;`);
     lines.push(`    rdfs:range mro:${rel.range} ;`);
+    lines.push(
+      `    mro:sourceMultiplicity "${esc(rel.sourceMultiplicity)}" ;`,
+      `    mro:targetMultiplicity "${esc(rel.targetMultiplicity)}" ;`,
+    );
     if (rel.deprecated) {
       lines.push(`    owl:deprecated true ;`);
     }

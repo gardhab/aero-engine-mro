@@ -1311,9 +1311,11 @@ export const GetOntologyResponse = zod.object({
 })),
   "relationships": zod.array(zod.object({
   "id": zod.string(),
-  "label": zod.string(),
+  "label": zod.string().describe('Directional verb name read domain → range'),
   "domain": zod.string().describe('Source class id'),
   "range": zod.string().describe('Target class id'),
+  "sourceMultiplicity": zod.string().describe('Multiplicity at the domain (source) end, e.g. 1, 0..\*, 1..\*'),
+  "targetMultiplicity": zod.string().describe('Multiplicity at the range (target) end, e.g. 1, 0..\*, 1..\*'),
   "description": zod.string().nullish(),
   "deprecated": zod.boolean()
 })),
@@ -1343,9 +1345,11 @@ export const GetOntologyDraftResponse = zod.object({
 })),
   "relationships": zod.array(zod.object({
   "id": zod.string(),
-  "label": zod.string(),
+  "label": zod.string().describe('Directional verb name read domain → range'),
   "domain": zod.string().describe('Source class id'),
   "range": zod.string().describe('Target class id'),
+  "sourceMultiplicity": zod.string().describe('Multiplicity at the domain (source) end, e.g. 1, 0..\*, 1..\*'),
+  "targetMultiplicity": zod.string().describe('Multiplicity at the range (target) end, e.g. 1, 0..\*, 1..\*'),
   "description": zod.string().nullish(),
   "deprecated": zod.boolean()
 })),
@@ -1451,18 +1455,56 @@ export const UpdateOntologyClassResponse = zod.object({
 
 
 
+
+
 export const CreateOntologyRelationshipBody = zod.object({
   "label": zod.string().min(1),
   "domain": zod.string(),
   "range": zod.string(),
+  "sourceMultiplicity": zod.string().min(1),
+  "targetMultiplicity": zod.string().min(1),
   "description": zod.string().optional()
 })
 
 export const CreateOntologyRelationshipResponse = zod.object({
   "id": zod.string(),
-  "label": zod.string(),
+  "label": zod.string().describe('Directional verb name read domain → range'),
   "domain": zod.string().describe('Source class id'),
   "range": zod.string().describe('Target class id'),
+  "sourceMultiplicity": zod.string().describe('Multiplicity at the domain (source) end, e.g. 1, 0..\*, 1..\*'),
+  "targetMultiplicity": zod.string().describe('Multiplicity at the range (target) end, e.g. 1, 0..\*, 1..\*'),
+  "description": zod.string().nullish(),
+  "deprecated": zod.boolean()
+})
+
+
+/**
+ * @summary Update a draft ontology relationship (name, multiplicities, description)
+ */
+export const UpdateOntologyRelationshipParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+
+
+
+
+export const UpdateOntologyRelationshipBody = zod.object({
+  "label": zod.string().min(1).optional(),
+  "sourceMultiplicity": zod.string().min(1).optional(),
+  "targetMultiplicity": zod.string().min(1).optional(),
+  "description": zod.string().optional(),
+  "deprecated": zod.boolean().optional()
+})
+
+export const UpdateOntologyRelationshipResponse = zod.object({
+  "id": zod.string(),
+  "label": zod.string().describe('Directional verb name read domain → range'),
+  "domain": zod.string().describe('Source class id'),
+  "range": zod.string().describe('Target class id'),
+  "sourceMultiplicity": zod.string().describe('Multiplicity at the domain (source) end, e.g. 1, 0..\*, 1..\*'),
+  "targetMultiplicity": zod.string().describe('Multiplicity at the range (target) end, e.g. 1, 0..\*, 1..\*'),
   "description": zod.string().nullish(),
   "deprecated": zod.boolean()
 })

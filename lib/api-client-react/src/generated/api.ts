@@ -48,6 +48,7 @@ import type {
   OntologyPublishInput,
   OntologyRelationship,
   OntologyRelationshipInput,
+  OntologyRelationshipUpdate,
   OntologyTurtle,
   OntologyValidationResult,
   OntologyVersion,
@@ -2740,6 +2741,78 @@ export const useCreateOntologyRelationship = <TError = ErrorType<BadRequestRespo
         TContext
       > => {
       return useMutation(getCreateOntologyRelationshipMutationOptions(options));
+    }
+
+export const getUpdateOntologyRelationshipUrl = (id: string,) => {
+
+
+
+
+  return `/api/ontology/relationships/${id}`
+}
+
+/**
+ * @summary Update a draft ontology relationship (name, multiplicities, description)
+ */
+export const updateOntologyRelationship = async (id: string,
+    ontologyRelationshipUpdate: OntologyRelationshipUpdate, options?: RequestInit): Promise<OntologyRelationship> => {
+
+  return customFetch<OntologyRelationship>(getUpdateOntologyRelationshipUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(ontologyRelationshipUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateOntologyRelationshipMutationOptions = <TError = ErrorType<BadRequestResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOntologyRelationship>>, TError,{id: string;data: BodyType<OntologyRelationshipUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateOntologyRelationship>>, TError,{id: string;data: BodyType<OntologyRelationshipUpdate>}, TContext> => {
+
+const mutationKey = ['updateOntologyRelationship'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateOntologyRelationship>>, {id: string;data: BodyType<OntologyRelationshipUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateOntologyRelationship(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateOntologyRelationshipMutationResult = NonNullable<Awaited<ReturnType<typeof updateOntologyRelationship>>>
+    export type UpdateOntologyRelationshipMutationBody = BodyType<OntologyRelationshipUpdate>
+    export type UpdateOntologyRelationshipMutationError = ErrorType<BadRequestResponse | NotFoundResponse>
+
+    /**
+ * @summary Update a draft ontology relationship (name, multiplicities, description)
+ */
+export const useUpdateOntologyRelationship = <TError = ErrorType<BadRequestResponse | NotFoundResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOntologyRelationship>>, TError,{id: string;data: BodyType<OntologyRelationshipUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateOntologyRelationship>>,
+        TError,
+        {id: string;data: BodyType<OntologyRelationshipUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateOntologyRelationshipMutationOptions(options));
     }
 
 export const getValidateOntologyUrl = () => {

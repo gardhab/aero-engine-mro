@@ -69,6 +69,7 @@ export * from './ontologyImpact';
 export * from './ontologyPublishInput';
 export * from './ontologyRelationship';
 export * from './ontologyRelationshipInput';
+export * from './ontologyRelationshipUpdate';
 export * from './ontologyStatus';
 export * from './ontologyTurtle';
 export * from './ontologyValidationIssue';

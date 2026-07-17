@@ -5,6 +5,7 @@ import type {
   OntologyImpact,
   Rule,
 } from "../types.js";
+import { multiplicityError } from "./multiplicity.js";
 
 export interface ImpactCounts {
   /** Number of graph instance nodes per class id. */
@@ -53,8 +54,32 @@ export function validateOntology(
     }
   }
 
-  // Relationship endpoints must resolve to existing, non-deprecated classes.
+  // Relationship endpoints must resolve to existing, non-deprecated classes,
+  // and both-end multiplicities must be present and well-formed.
   for (const rel of ontology.relationships) {
+    if (!rel.label.trim()) {
+      issues.push({
+        severity: "error",
+        message: `Relationship "${rel.id}" has an empty directional name.`,
+        target: rel.id,
+      });
+    }
+    const srcErr = multiplicityError(rel.sourceMultiplicity);
+    if (srcErr) {
+      issues.push({
+        severity: "error",
+        message: `Relationship "${rel.id}" source-end multiplicity: ${srcErr}.`,
+        target: rel.id,
+      });
+    }
+    const tgtErr = multiplicityError(rel.targetMultiplicity);
+    if (tgtErr) {
+      issues.push({
+        severity: "error",
+        message: `Relationship "${rel.id}" target-end multiplicity: ${tgtErr}.`,
+        target: rel.id,
+      });
+    }
     if (!classIds.has(rel.domain)) {
       issues.push({
         severity: "error",

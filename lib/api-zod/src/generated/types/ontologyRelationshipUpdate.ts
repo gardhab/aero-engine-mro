@@ -6,14 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface OntologyRelationshipInput {
+export interface OntologyRelationshipUpdate {
   /** @minLength 1 */
-  label: string;
-  domain: string;
-  range: string;
+  label?: string;
   /** @minLength 1 */
-  sourceMultiplicity: string;
+  sourceMultiplicity?: string;
   /** @minLength 1 */
-  targetMultiplicity: string;
+  targetMultiplicity?: string;
   description?: string;
+  deprecated?: boolean;
 }

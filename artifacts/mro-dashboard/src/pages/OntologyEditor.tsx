@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useGetOntologyDraft, useValidateOntology, usePublishOntology, useCreateOntologyClass, getGetOntologyDraftQueryKey } from '@workspace/api-client-react';
+import { useGetOntologyDraft, useValidateOntology, usePublishOntology, useCreateOntologyClass, useCreateOntologyRelationship, useUpdateOntologyRelationship, getGetOntologyDraftQueryKey } from '@workspace/api-client-react';
 import {
   Button,
   Tabs,
@@ -9,6 +9,8 @@ import {
   TabPanel,
   Modal,
   TextInput,
+  Select,
+  SelectItem,
   InlineNotification,
   Tile,
   StructuredListWrapper,
@@ -18,8 +20,8 @@ import {
   StructuredListBody,
   Tag
 } from '@carbon/react';
-import { Play, CheckmarkOutline, Warning } from '@carbon/icons-react';
-import ReactFlow, { Background, Controls, MiniMap, useNodesState, useEdgesState, Handle, Position, Panel } from 'reactflow';
+import { Play, CheckmarkOutline, Warning, Edit } from '@carbon/icons-react';
+import ReactFlow, { Background, Controls, MiniMap, useNodesState, useEdgesState, Handle, Position, Panel, EdgeLabelRenderer, getSmoothStepPath, type EdgeProps } from 'reactflow';
 import { useQueryClient } from '@tanstack/react-query';
 
 // ---------- UML class-diagram rendering ----------
@@ -33,27 +35,50 @@ const UML_LAYERS: Record<string, number> = {
   LifeLimitedPart: 4, PiecePart: 4,
 };
 
-/** UML association multiplicities [domain, range] per relationship id. */
-const UML_MULTIPLICITY: Record<string, [string, string]> = {
-  hasModule: ['1', '1..*'],
-  hasComponent: ['1', '0..*'],
-  hasPiecePart: ['1', '0..*'],
-  monitoredBy: ['1', '1..*'],
-  indicates: ['0..*', '0..*'],
-  affects: ['0..*', '1..*'],
-  detects: ['1', '1'],
-  evaluates: ['0..*', '1'],
-  generates: ['1', '0..*'],
-  appliesTo: ['0..*', '1'],
-  recommends: ['1', '1..*'],
-  governedBy: ['0..*', '1..*'],
-  dispatchedAs: ['1', '0..1'],
-  concerns: ['0..*', '1'],
-  mandates: ['1', '0..*'],
-  acknowledgedBy: ['1', '0..1'],
+const UML_NODE_WIDTH = 230;
+
+const EDGE_LABEL_STYLE: React.CSSProperties = {
+  position: 'absolute',
+  fontFamily: 'IBM Plex Sans',
+  fontSize: 11,
+  color: '#161616',
+  background: 'rgba(255,255,255,0.9)',
+  padding: '0 3px',
+  pointerEvents: 'none',
 };
 
-const UML_NODE_WIDTH = 230;
+/**
+ * UML association edge: directional verb name at the midpoint and the stored
+ * multiplicities rendered at both ends (near the source and target classes).
+ */
+function UmlAssociationEdge({
+  sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data,
+}: EdgeProps<{ label: string; sourceMultiplicity: string; targetMultiplicity: string }>) {
+  const [path, labelX, labelY] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
+  // Offset the end labels a little along the edge so they clear the class boxes.
+  const srcLX = sourceX + (targetX - sourceX) * 0.06 + 10;
+  const srcLY = sourceY + (targetY - sourceY) * 0.06 + 4;
+  const tgtLX = targetX + (sourceX - targetX) * 0.06 + 10;
+  const tgtLY = targetY + (sourceY - targetY) * 0.06 - 4;
+  return (
+    <>
+      <path d={path} fill="none" stroke="#525252" strokeWidth={1.2} markerEnd="url(#uml-association)" />
+      <EdgeLabelRenderer>
+        <div style={{ ...EDGE_LABEL_STYLE, transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`, fontStyle: 'italic' }}>
+          {data?.label} ▸
+        </div>
+        <div style={{ ...EDGE_LABEL_STYLE, transform: `translate(-50%, -50%) translate(${srcLX}px, ${srcLY}px)` }}>
+          {data?.sourceMultiplicity}
+        </div>
+        <div style={{ ...EDGE_LABEL_STYLE, transform: `translate(-50%, -50%) translate(${tgtLX}px, ${tgtLY}px)` }}>
+          {data?.targetMultiplicity}
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
+const umlEdgeTypes = { umlAssociation: UmlAssociationEdge };
 
 interface UmlAttr { name: string; type: string }
 
@@ -135,6 +160,12 @@ export default function OntologyEditor() {
   const [publishNote, setPublishNote] = useState('');
   const [showAddClass, setShowAddClass] = useState(false);
   const [newClass, setNewClass] = useState({ label: '', description: '' });
+  const createRelMut = useCreateOntologyRelationship();
+  const updateRelMut = useUpdateOntologyRelationship();
+  const [showAddRel, setShowAddRel] = useState(false);
+  const [newRel, setNewRel] = useState({ label: '', domain: '', range: '', sourceMultiplicity: '1', targetMultiplicity: '0..*', description: '' });
+  const [editRel, setEditRel] = useState<null | { id: string; label: string; sourceMultiplicity: string; targetMultiplicity: string; description: string }>(null);
+  const [relError, setRelError] = useState<string | null>(null);
 
   // Map ontology to a UML class diagram: layered top-down layout so the
   // physical hierarchy Engine → Module → Component → PiecePart reads vertically.
@@ -165,24 +196,22 @@ export default function OntologyEditor() {
       },
     }));
 
-    // Associations: solid directed lines with role label + multiplicities.
+    // Associations: solid directed lines with the stored directional name and
+    // both-end multiplicities rendered by the custom edge.
     const classIds = new Set(ontology.classes.map(c => c.id));
-    const edges = ontology.relationships
+    const edges: any[] = ontology.relationships
       .filter(r => classIds.has(r.domain) && classIds.has(r.range))
-      .map(r => {
-        const [m0, m1] = UML_MULTIPLICITY[r.id] ?? ['1', '0..*'];
-        return {
-          id: r.id,
-          source: r.domain,
-          target: r.range,
-          label: `${r.label}  ${m0} → ${m1}`,
-          type: 'smoothstep',
-          style: { stroke: '#525252', strokeWidth: 1.2 },
-          labelStyle: { fontFamily: 'IBM Plex Sans', fontSize: 11, fill: '#161616' },
-          labelBgStyle: { fill: '#ffffff', fillOpacity: 0.9 },
-          markerEnd: 'url(#uml-association)',
-        };
-      });
+      .map(r => ({
+        id: r.id,
+        source: r.domain,
+        target: r.range,
+        type: 'umlAssociation',
+        data: {
+          label: r.label,
+          sourceMultiplicity: r.sourceMultiplicity,
+          targetMultiplicity: r.targetMultiplicity,
+        },
+      }));
 
     // Generalizations: hollow-triangle arrows from subclass to superclass.
     for (const c of ontology.classes) {
@@ -240,6 +269,30 @@ export default function OntologyEditor() {
     });
   };
 
+  const refreshDraft = () => queryClient.invalidateQueries({ queryKey: getGetOntologyDraftQueryKey() });
+
+  const handleAddRel = () => {
+    setRelError(null);
+    createRelMut.mutate({ data: newRel }, {
+      onSuccess: () => {
+        setShowAddRel(false);
+        setNewRel({ label: '', domain: '', range: '', sourceMultiplicity: '1', targetMultiplicity: '0..*', description: '' });
+        refreshDraft();
+      },
+      onError: (e: any) => setRelError(e?.response?.data?.error ?? 'Failed to create relationship'),
+    });
+  };
+
+  const handleUpdateRel = () => {
+    if (!editRel) return;
+    setRelError(null);
+    const { id, ...data } = editRel;
+    updateRelMut.mutate({ id, data }, {
+      onSuccess: () => { setEditRel(null); refreshDraft(); },
+      onError: (e: any) => setRelError(e?.response?.data?.error ?? 'Failed to update relationship'),
+    });
+  };
+
   if (isLoading) return <div className="page-container">Loading...</div>;
 
   return (
@@ -277,6 +330,7 @@ export default function OntologyEditor() {
         <TabList aria-label="Ontology views">
           <Tab>Visual Map</Tab>
           <Tab>Classes ({ontology?.classes.length || 0})</Tab>
+          <Tab>Relationships ({ontology?.relationships.length || 0})</Tab>
         </TabList>
         <TabPanels className="flex-1 min-h-0 relative">
           <TabPanel className="h-full p-0 pt-4">
@@ -286,6 +340,7 @@ export default function OntologyEditor() {
                 nodes={nodes} 
                 edges={edges} 
                 nodeTypes={umlNodeTypes}
+                edgeTypes={umlEdgeTypes}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 fitView
@@ -326,8 +381,98 @@ export default function OntologyEditor() {
               </StructuredListBody>
             </StructuredListWrapper>
           </TabPanel>
+          <TabPanel className="h-full overflow-y-auto pt-4">
+            <div className="flex justify-end mb-4">
+              <Button size="sm" onClick={() => { setRelError(null); setShowAddRel(true); }}>Add Relationship</Button>
+            </div>
+            <StructuredListWrapper>
+              <StructuredListHead>
+                <StructuredListRow head>
+                  <StructuredListCell head>Name</StructuredListCell>
+                  <StructuredListCell head>Association</StructuredListCell>
+                  <StructuredListCell head>Multiplicity</StructuredListCell>
+                  <StructuredListCell head>Description</StructuredListCell>
+                  <StructuredListCell head></StructuredListCell>
+                </StructuredListRow>
+              </StructuredListHead>
+              <StructuredListBody>
+                {ontology?.relationships.map(r => (
+                  <StructuredListRow key={r.id}>
+                    <StructuredListCell><strong>{r.label}</strong><br /><small>{r.id}</small></StructuredListCell>
+                    <StructuredListCell>{r.domain} → {r.range}</StructuredListCell>
+                    <StructuredListCell><code>{r.sourceMultiplicity}</code> → <code>{r.targetMultiplicity}</code></StructuredListCell>
+                    <StructuredListCell>{r.description}</StructuredListCell>
+                    <StructuredListCell>
+                      <Button
+                        kind="ghost" size="sm" renderIcon={Edit} iconDescription="Edit"
+                        onClick={() => { setRelError(null); setEditRel({ id: r.id, label: r.label, sourceMultiplicity: r.sourceMultiplicity, targetMultiplicity: r.targetMultiplicity, description: r.description ?? '' }); }}
+                      >Edit</Button>
+                    </StructuredListCell>
+                  </StructuredListRow>
+                ))}
+              </StructuredListBody>
+            </StructuredListWrapper>
+          </TabPanel>
         </TabPanels>
       </Tabs>
+
+      <Modal
+        open={showAddRel}
+        modalHeading="Add Ontology Relationship"
+        primaryButtonText="Create"
+        secondaryButtonText="Cancel"
+        onRequestClose={() => setShowAddRel(false)}
+        onRequestSubmit={handleAddRel}
+        primaryButtonDisabled={!newRel.label || !newRel.domain || !newRel.range || createRelMut.isPending}
+      >
+        {relError && <InlineNotification kind="error" title="Error" subtitle={relError} lowContrast className="mb-4" />}
+        <TextInput id="rel-label" labelText="Directional name (verb, read source → target)" placeholder="e.g. recommends"
+          value={newRel.label} onChange={(e) => setNewRel({ ...newRel, label: e.target.value })} className="mb-4" />
+        <div className="flex gap-4 mb-4">
+          <Select id="rel-domain" labelText="Source class" value={newRel.domain} onChange={(e) => setNewRel({ ...newRel, domain: e.target.value })}>
+            <SelectItem value="" text="Choose…" />
+            {ontology?.classes.map(c => <SelectItem key={c.id} value={c.id} text={c.label} />)}
+          </Select>
+          <Select id="rel-range" labelText="Target class" value={newRel.range} onChange={(e) => setNewRel({ ...newRel, range: e.target.value })}>
+            <SelectItem value="" text="Choose…" />
+            {ontology?.classes.map(c => <SelectItem key={c.id} value={c.id} text={c.label} />)}
+          </Select>
+        </div>
+        <div className="flex gap-4 mb-4">
+          <TextInput id="rel-src-mult" labelText="Source-end multiplicity" placeholder="1, 0..1, 0..*, 1..*"
+            value={newRel.sourceMultiplicity} onChange={(e) => setNewRel({ ...newRel, sourceMultiplicity: e.target.value })} />
+          <TextInput id="rel-tgt-mult" labelText="Target-end multiplicity" placeholder="1, 0..1, 0..*, 1..*"
+            value={newRel.targetMultiplicity} onChange={(e) => setNewRel({ ...newRel, targetMultiplicity: e.target.value })} />
+        </div>
+        <TextInput id="rel-desc" labelText="Description"
+          value={newRel.description} onChange={(e) => setNewRel({ ...newRel, description: e.target.value })} />
+      </Modal>
+
+      <Modal
+        open={editRel !== null}
+        modalHeading={`Edit Relationship "${editRel?.id ?? ''}"`}
+        primaryButtonText="Save"
+        secondaryButtonText="Cancel"
+        onRequestClose={() => setEditRel(null)}
+        onRequestSubmit={handleUpdateRel}
+        primaryButtonDisabled={!editRel?.label || updateRelMut.isPending}
+      >
+        {relError && <InlineNotification kind="error" title="Error" subtitle={relError} lowContrast className="mb-4" />}
+        {editRel && (
+          <>
+            <TextInput id="edit-rel-label" labelText="Directional name (verb, read source → target)"
+              value={editRel.label} onChange={(e) => setEditRel({ ...editRel, label: e.target.value })} className="mb-4" />
+            <div className="flex gap-4 mb-4">
+              <TextInput id="edit-rel-src-mult" labelText="Source-end multiplicity"
+                value={editRel.sourceMultiplicity} onChange={(e) => setEditRel({ ...editRel, sourceMultiplicity: e.target.value })} />
+              <TextInput id="edit-rel-tgt-mult" labelText="Target-end multiplicity"
+                value={editRel.targetMultiplicity} onChange={(e) => setEditRel({ ...editRel, targetMultiplicity: e.target.value })} />
+            </div>
+            <TextInput id="edit-rel-desc" labelText="Description"
+              value={editRel.description} onChange={(e) => setEditRel({ ...editRel, description: e.target.value })} />
+          </>
+        )}
+      </Modal>
 
       <Modal
         open={showPublishModal}

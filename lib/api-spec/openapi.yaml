@@ -683,6 +683,34 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
 
+  /ontology/relationships/{id}:
+    patch:
+      operationId: updateOntologyRelationship
+      tags: [ontology]
+      summary: Update a draft ontology relationship (name, multiplicities, description)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OntologyRelationshipUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OntologyRelationship"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /ontology/validate:
     post:
       operationId: validateOntology
@@ -1369,23 +1397,51 @@ components:
 
     OntologyRelationship:
       type: object
-      required: [id, label, domain, range, deprecated]
+      required:
+        [
+          id,
+          label,
+          domain,
+          range,
+          sourceMultiplicity,
+          targetMultiplicity,
+          deprecated,
+        ]
       properties:
         id: { type: string }
-        label: { type: string }
+        label:
+          type: string
+          description: "Directional verb name read domain → range"
         domain: { type: string, description: "Source class id" }
         range: { type: string, description: "Target class id" }
+        sourceMultiplicity:
+          type: string
+          description: "Multiplicity at the domain (source) end, e.g. 1, 0..*, 1..*"
+        targetMultiplicity:
+          type: string
+          description: "Multiplicity at the range (target) end, e.g. 1, 0..*, 1..*"
         description: { type: ["string", "null"] }
         deprecated: { type: boolean }
 
     OntologyRelationshipInput:
       type: object
-      required: [label, domain, range]
+      required: [label, domain, range, sourceMultiplicity, targetMultiplicity]
       properties:
         label: { type: string, minLength: 1 }
         domain: { type: string }
         range: { type: string }
+        sourceMultiplicity: { type: string, minLength: 1 }
+        targetMultiplicity: { type: string, minLength: 1 }
         description: { type: string }
+
+    OntologyRelationshipUpdate:
+      type: object
+      properties:
+        label: { type: string, minLength: 1 }
+        sourceMultiplicity: { type: string, minLength: 1 }
+        targetMultiplicity: { type: string, minLength: 1 }
+        description: { type: string }
+        deprecated: { type: boolean }
 
     Ontology:
       type: object

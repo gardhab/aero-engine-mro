@@ -4,6 +4,7 @@ export * from "./data/synthetic.js";
 export * from "./data/piece-parts.js";
 export * from "./ontology/seed.js";
 export * from "./ontology/turtle.js";
+export * from "./ontology/multiplicity.js";
 export * from "./ontology/validate.js";
 export * from "./rules/seed.js";
 export * from "./rules/engine.js";

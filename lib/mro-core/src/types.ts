@@ -178,9 +178,14 @@ export interface OntologyClass {
 
 export interface OntologyRelationship {
   id: string;
+  /** Directional verb name read domain → range (e.g. "recommends"). */
   label: string;
   domain: string;
   range: string;
+  /** Multiplicity at the domain (source) end, e.g. "1", "0..*", "1..*". */
+  sourceMultiplicity: string;
+  /** Multiplicity at the range (target) end, e.g. "1", "0..*", "1..*". */
+  targetMultiplicity: string;
   description?: string | null;
   deprecated: boolean;
 }

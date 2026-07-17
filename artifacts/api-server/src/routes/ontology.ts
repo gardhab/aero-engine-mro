@@ -11,12 +11,15 @@ import {
   CreateOntologyClassResponse,
   UpdateOntologyClassResponse,
   CreateOntologyRelationshipResponse,
+  UpdateOntologyRelationshipResponse,
   ValidateOntologyResponse,
   PublishOntologyResponse,
 } from "@workspace/api-zod";
 import {
   serializeToTurtle,
   validateOntology,
+  normalizeRelationships,
+  multiplicityError,
   type Ontology,
   type OntologyClass,
   type OntologyRelationship,
@@ -31,13 +34,23 @@ import { getGraphStore } from "../lib/mro/graph";
 
 const router: IRouter = Router();
 
+/**
+ * Older stored versions predate first-class multiplicities; default them on
+ * read so every relationship always carries both-end multiplicities.
+ */
+function withNormalizedRelationships(
+  row: OntologyVersionRow,
+): OntologyVersionRow {
+  return { ...row, relationships: normalizeRelationships(row.relationships) };
+}
+
 async function loadDraft(): Promise<OntologyVersionRow | undefined> {
   const [row] = await db
     .select()
     .from(ontologyVersionsTable)
     .where(eq(ontologyVersionsTable.status, "draft"))
     .limit(1);
-  return row;
+  return row ? withNormalizedRelationships(row) : undefined;
 }
 
 async function loadPublished(): Promise<OntologyVersionRow | undefined> {
@@ -47,7 +60,7 @@ async function loadPublished(): Promise<OntologyVersionRow | undefined> {
     .where(eq(ontologyVersionsTable.status, "published"))
     .orderBy(desc(ontologyVersionsTable.createdAt))
     .limit(1);
-  return row;
+  return row ? withNormalizedRelationships(row) : undefined;
 }
 
 async function graphCounts(): Promise<Record<string, number>> {
@@ -205,10 +218,22 @@ router.post("/ontology/relationships", async (req, res): Promise<void> => {
     label: string;
     domain: string;
     range: string;
+    sourceMultiplicity: string;
+    targetMultiplicity: string;
     description?: string;
   };
   if (!body.label || !body.domain || !body.range) {
     res.status(400).json({ error: "label, domain and range are required" });
+    return;
+  }
+  const srcErr = multiplicityError(body.sourceMultiplicity);
+  if (srcErr) {
+    res.status(400).json({ error: `sourceMultiplicity: ${srcErr}` });
+    return;
+  }
+  const tgtErr = multiplicityError(body.targetMultiplicity);
+  if (tgtErr) {
+    res.status(400).json({ error: `targetMultiplicity: ${tgtErr}` });
     return;
   }
   const id = toCamelCase(body.label);
@@ -221,6 +246,8 @@ router.post("/ontology/relationships", async (req, res): Promise<void> => {
     label: body.label,
     domain: body.domain,
     range: body.range,
+    sourceMultiplicity: body.sourceMultiplicity.trim(),
+    targetMultiplicity: body.targetMultiplicity.trim(),
     description: body.description ?? null,
     deprecated: false,
   };
@@ -229,6 +256,62 @@ router.post("/ontology/relationships", async (req, res): Promise<void> => {
   await logActivity("ontology", `Ontology relationship "${id}" added to draft.`);
   res.status(201).json(CreateOntologyRelationshipResponse.parse(rel));
 });
+
+router.patch(
+  "/ontology/relationships/:id",
+  async (req, res): Promise<void> => {
+    const draft = await loadDraft();
+    if (!draft) {
+      res.status(404).json({ error: "No draft ontology" });
+      return;
+    }
+    const idx = draft.relationships.findIndex((r) => r.id === req.params.id);
+    if (idx === -1) {
+      res.status(404).json({ error: "Relationship not found" });
+      return;
+    }
+    const body = req.body as Partial<OntologyRelationship>;
+    if (body.label !== undefined && !body.label.trim()) {
+      res.status(400).json({ error: "label cannot be empty" });
+      return;
+    }
+    if (body.sourceMultiplicity !== undefined) {
+      const err = multiplicityError(body.sourceMultiplicity);
+      if (err) {
+        res.status(400).json({ error: `sourceMultiplicity: ${err}` });
+        return;
+      }
+    }
+    if (body.targetMultiplicity !== undefined) {
+      const err = multiplicityError(body.targetMultiplicity);
+      if (err) {
+        res.status(400).json({ error: `targetMultiplicity: ${err}` });
+        return;
+      }
+    }
+    const current = draft.relationships[idx];
+    const updated: OntologyRelationship = {
+      ...current,
+      label: body.label ?? current.label,
+      sourceMultiplicity:
+        body.sourceMultiplicity?.trim() ?? current.sourceMultiplicity,
+      targetMultiplicity:
+        body.targetMultiplicity?.trim() ?? current.targetMultiplicity,
+      description:
+        body.description !== undefined ? body.description : current.description,
+      deprecated:
+        body.deprecated !== undefined ? body.deprecated : current.deprecated,
+    };
+    const relationships = [...draft.relationships];
+    relationships[idx] = updated;
+    await saveDraft(draft, { relationships });
+    await logActivity(
+      "ontology",
+      `Ontology relationship "${updated.id}" updated.`,
+    );
+    res.json(UpdateOntologyRelationshipResponse.parse(updated));
+  },
+);
 
 router.post("/ontology/validate", async (_req, res): Promise<void> => {
   const draft = await loadDraft();
