@@ -1,0 +1,88 @@
+In an aero engine MRO environment, a Task Control Number (TCN) is a unique identifier assigned to a specific maintenance task or work package. It enables every task performed during an engine shop visit to be planned, tracked, controlled, and recorded throughout the overhaul process.
+
+A TCN provides full traceability by linking:
+
+The maintenance task or operation
+The engine, module, or component
+The applicable maintenance manual or work instruction
+The technician(s) performing the work
+Inspection and quality approvals
+Any associated parts, tooling, and measurements
+Completion status and timestamps
+Typical uses of a TCN
+
+A TCN may be assigned to tasks such as:
+
+Engine induction inspection
+Fan module disassembly
+High-pressure turbine blade inspection
+Bearing replacement
+Non-destructive testing (NDT)
+Module assembly
+Engine test cell run
+Final inspection and release
+Each task has its own TCN, allowing planners and production controllers to monitor progress in real time.
+
+Why TCNs are important
+
+They support:
+
+Production control – monitoring which tasks are complete, in progress, or awaiting action.
+Resource planning – assigning technicians, tooling, and facilities to tasks.
+Regulatory compliance – providing a complete audit trail for authorities and customers.
+Quality assurance – recording inspections, measurements, and sign-offs.
+Turnaround time (TAT) management – identifying bottlenecks and overdue tasks on the critical path.
+Example
+
+For an engine overhaul, the work package might include:
+
+TCN
+
+Task
+
+Status
+
+TCN-1001
+
+Engine induction inspection
+
+Complete
+
+TCN-1015
+
+HPC module strip
+
+In Progress
+
+TCN-1042
+
+HPT blade dimensional inspection
+
+Awaiting parts
+
+TCN-1080
+
+Module assembly
+
+Not Started
+
+TCN-1125
+
+Engine test cell run
+
+Scheduled
+
+Production teams can quickly identify that TCN-1042 is delaying downstream assembly, allowing them to prioritise parts or engineering support.
+
+Best practice
+
+To improve MRO performance, leading organisations integrate TCNs with:
+
+Digital work instructions
+Barcode or RFID tracking
+OCR for automatic capture of part and serial numbers
+Electronic technician and inspector sign-offs
+Real-time production dashboards
+Critical path and TAT analytics
+This creates end-to-end visibility of every maintenance task, helping reduce delays, improve schedule adherence, and maintain complete traceability.
+

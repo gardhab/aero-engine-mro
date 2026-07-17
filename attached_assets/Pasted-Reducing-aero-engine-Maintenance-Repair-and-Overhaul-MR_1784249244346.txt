@@ -1,0 +1,226 @@
+Reducing aero engine Maintenance, Repair and Overhaul (MRO) turnaround time (TAT) requires optimizing the entire value stream rather than just making the shop floor faster. The highest-performing engine MRO organizations focus on removing waiting time, improving planning accuracy, and eliminating rework.
+
+A practical approach is to focus on the following areas, roughly in order of impact:
+
+Area
+
+Opportunity
+
+Typical Impact
+
+Induction & planning
+
+Better work scoping before arrival
+
+High
+
+Material availability
+
+Eliminate parts shortages
+
+Very High
+
+Engine strip & inspection
+
+Faster inspections with digital tools
+
+Medium
+
+Repair process
+
+Reduce queue times between repair cells
+
+High
+
+Assembly & test
+
+Right-first-time assembly
+
+Medium
+
+Digital operations
+
+Real-time workflow management
+
+High
+
+1. Improve pre-induction planning (highest return)
+
+Many delays begin before the engine reaches the shop.
+
+Best practices include:
+
+Complete digital records before engine arrival.
+Predict LLP replacement and repair requirements using fleet data.
+Pre-order known material.
+Reserve tooling and specialist resources.
+Freeze the shop visit scope as early as possible.
+This allows work to begin immediately instead of waiting for engineering decisions.
+
+
+2. Eliminate material shortages
+
+Parts availability is often the single largest contributor to TAT.
+
+Focus on:
+
+Critical spare part buffers
+Repair exchange pools
+Supplier performance management
+Automated reorder points
+Visibility of repairable assets
+Alternative repair routes where approved
+A single missing HPT blade or bearing can delay an entire engine.
+
+
+3. Improve work scope prediction
+
+Using historical overhaul data and engine health monitoring allows the MRO to predict:
+
+likely scrap rates
+expected repairs
+LLP replacements
+module findings
+Predictive analytics means fewer surprises during strip.
+
+
+4. Reduce waiting—not processing time
+
+In most MROs, only a small fraction of TAT is value-adding work. Engines often spend much longer waiting between operations.
+
+Typical causes include:
+
+Waiting for engineering dispositions
+Waiting for inspectors
+Waiting for transport
+Waiting for cranes
+Waiting for repair slots
+Waiting for missing paperwork
+Reducing these queues often delivers greater gains than making individual tasks faster.
+
+
+5. Introduce flow-based production
+
+Rather than batching engines, create continuous flow where possible by:
+
+Visual production control
+Daily scheduling
+Limiting work in progress
+Dedicated module flow lines
+Pull systems between operations
+This reduces congestion and improves predictability.
+
+
+6. Digital work instructions and OCR
+
+Replacing paper-based processes with digital systems can reduce delays and transcription errors.
+
+Useful technologies include:
+
+OCR for part and serial number capture
+Barcode and QR scanning
+RFID tracking
+Tablet-based work instructions
+Digital sign-offs
+Automated compliance checks
+These also reduce the risk of incorrect part or serial number recording.
+
+
+7. Improve first-time quality
+
+Every rework loop adds days or weeks.
+
+Focus on:
+
+Standard work
+Error-proofing (Poka-Yoke)
+Independent quality gates
+Digital torque recording
+Automated inspection where appropriate
+Technician certification
+Reducing rework improves both TAT and cost.
+
+
+8. Optimise repair routing
+
+Not every part requires the same repair route.
+
+Review:
+
+Internal vs external repair decisions
+Repair prioritisation
+Specialist capacity
+Repair batching
+Approved alternative repair schemes
+A dynamic repair routing process can significantly reduce elapsed time.
+
+
+9. Use real-time production management
+
+Leading MROs use live operational dashboards showing:
+
+Engine location
+Current operation
+Time in operation
+Queue time
+Critical path
+Material shortages
+Engineering queries
+Predicted completion date
+This enables proactive intervention before delays escalate.
+
+
+10. Measure the right KPIs
+
+Rather than focusing solely on total TAT, monitor the drivers of delay:
+
+Total Turnaround Time
+Queue Time (% of TAT)
+First Pass Yield
+Schedule Adherence
+Parts Availability
+Engineering Query Resolution Time
+External Repair Lead Time
+Technician Productivity
+Resource Utilisation
+Work-in-Progress (WIP)
+Right First Time
+On-Time Engine Delivery
+
+Example value tree
+
+Reduce Engine TAT
+│
+├── Reduce Waiting
+│   ├── Material availability
+│   ├── Engineering approvals
+│   ├── Repair queues
+│   └── Resource availability
+│
+├── Reduce Processing Time
+│   ├── Standard work
+│   ├── Digital work instructions
+│   ├── Improved tooling
+│   └── Automation
+│
+├── Reduce Rework
+│   ├── First-time quality
+│   ├── Technician capability
+│   └── Error proofing
+│
+└── Improve Planning
+    ├── Predictive work scoping
+    ├── Digital planning
+    ├── Parts forecasting
+    └── Capacity planning
+Given your background in aerospace MRO and operational excellence, I’d prioritise initiatives in this order based on typical impact:
+
+Parts and repair availability
+End-to-end value stream mapping to eliminate waiting time
+Predictive work scoping before engine induction
+Daily production control with critical-path management
+Digital capture of part/serial numbers (OCR and barcode scanning)
+Lean flow and WIP reduction
+First-time quality improvements
+AI-driven forecasting for materials, repair demand, and TAT prediction
+Together, these initiatives can often reduce average engine turnaround time by 20–40% while also improving delivery reliability and lowering operating costs.

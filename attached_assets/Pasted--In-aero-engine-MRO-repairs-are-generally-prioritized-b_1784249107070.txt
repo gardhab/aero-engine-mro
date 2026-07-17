@@ -1,0 +1,163 @@
+
+ 
+In aero engine MRO, repairs are generally prioritized by safety, regulatory compliance, and contractual requirements, rather than just cost or convenience. While the exact categorization varies between OEMs (such as Rolls-Royce, GE Aerospace, and Pratt & Whitney) and MROs, a typical hierarchy is as follows:
+
+Priority
+
+Category
+
+Description
+
+Can the engine be released without it?
+
+1
+
+Airworthiness Mandatory
+
+Required to meet certified airworthiness requirements or mandatory instructions.
+
+No
+
+2
+
+Life-Limited Part (LLP) Compliance
+
+Replacement of parts that have reached certified life limits.
+
+No
+
+3
+
+Safety-Critical Repairs
+
+Repairs affecting structural integrity, containment, or safe operation.
+
+No
+
+4
+
+Regulatory / Mandatory Service Bulletins & Airworthiness Directives
+
+Compliance with applicable Airworthiness Directives (ADs) and customer-mandated Service Bulletins (SBs).
+
+Usually No (ADs always; SBs depend on customer/regulator requirements)
+
+5
+
+Functional Restoration
+
+Repairs needed to restore engine performance and ensure it meets the engine manual limits.
+
+Generally No
+
+6
+
+Reliability Improvements
+
+Repairs or modifications intended to reduce future removals or improve durability.
+
+Yes (if not mandatory)
+
+7
+
+Cosmetic / Minor Repairs
+
+Appearance or non-functional repairs.
+
+Yes
+
+Category 1 – Airworthiness Mandatory
+
+These repairs are essential because the engine would no longer comply with its certified type design or maintenance requirements.
+
+Examples include:
+
+Cracks beyond allowable limits
+Out-of-limit dimensions
+Failed critical inspections
+Non-compliance with the Engine Manual (EM), Component Maintenance Manual (CMM), or approved repair limits
+These items must be rectified before return to service.
+
+
+Category 2 – Life-Limited Parts (LLPs)
+
+LLPs have certified cyclic or hourly life limits.
+
+Examples:
+
+Turbine discs
+Compressor discs
+Shafts
+Certain seals
+Once an LLP reaches its approved life limit, it must be replaced—there is no extension without specific regulatory approval.
+
+
+Category 3 – Safety-Critical Repairs
+
+These involve components whose failure could have catastrophic consequences.
+
+Examples:
+
+Fan containment components
+Turbine discs
+Main shafts
+Bearing support structures
+Critical bolted joints
+These repairs receive the highest engineering scrutiny and inspection requirements.
+
+
+Category 4 – Regulatory Requirements
+
+These include:
+
+Airworthiness Directives (mandatory)
+Mandatory OEM Service Bulletins
+Regulatory findings
+Customer contractual requirements
+Some Service Bulletins are optional from a regulatory perspective but may be contractually required by the operator.
+
+
+Category 5 – Functional Restoration
+
+These ensure the engine can meet operational requirements.
+
+Examples:
+
+Tip clearance restoration
+Blade replacement
+Seal restoration
+Combustor repairs
+Balance corrections
+These repairs help ensure the engine achieves the required thrust, fuel efficiency, vibration levels, and exhaust gas temperature (EGT) margin.
+
+
+Category 6 – Reliability Improvements
+
+These are often incorporated during overhaul because the engine is already disassembled.
+
+Examples:
+
+Latest approved repair schemes
+Durability upgrades
+Improved coatings
+Modified hardware to reduce future shop visits
+These repairs are usually driven by lifecycle cost and fleet reliability rather than immediate airworthiness.
+
+
+Category 7 – Cosmetic Repairs
+
+Examples:
+
+Paint touch-up
+Surface finish improvements
+Non-functional appearance defects
+These have no impact on the engine’s airworthiness.
+
+How leading MROs prioritise work
+
+In practice, production control often classifies repairs into three operational buckets:
+
+Red (Must Do): Airworthiness, LLPs, safety-critical repairs, mandatory ADs/SBs. These are on the critical path and must be completed before release.
+Amber (Should Do): Performance and reliability repairs that improve engine life or efficiency and are normally completed during the shop visit.
+Green (Could Do): Opportunistic or cosmetic work that may be deferred if it does not affect safety, compliance, contractual obligations, or agreed performance targets.
+This approach helps planners focus engineering resources and material availability on the tasks that most directly affect turnaround time and regulatory compliance while still capturing opportunities to improve long-term engine reliability.
