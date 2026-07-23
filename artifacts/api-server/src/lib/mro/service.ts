@@ -10,6 +10,11 @@ import {
   shopVisitExchangesTable,
   activityTable,
   llpsTable,
+  workCentersTable,
+  areasTable,
+  operationSegmentsTable,
+  operationsRequestsTable,
+  personnelClassesTable,
 } from "@workspace/db";
 import {
   LLP_CRITICAL_REMAINING,
@@ -31,6 +36,9 @@ import {
   supersededSensorEdgeIds,
   toLifeLimitedParts,
   type ActivityType,
+  type GraphOperationSegment,
+  type GraphPersonnelClass,
+  type GraphWorkCentre,
   type OntologyClass,
   type PipelineResult,
   type Rule,
@@ -295,6 +303,10 @@ async function loadGraphInputs() {
     llpRows,
     wpTasks,
     latestReadingRows,
+    workCentreRows,
+    operationSegmentRows,
+    personnelClassRows,
+    operationsRequestRows,
   ] = await Promise.all([
     db.select().from(enginesTable),
     db.select().from(rulesTable),
@@ -311,7 +323,51 @@ async function loadGraphInputs() {
         readingsTable.parameter,
         desc(readingsTable.cycle),
       ),
+    // ISA-95: work centres with area name for display
+    db
+      .select({
+        id: workCentersTable.id,
+        name: workCentersTable.name,
+        workCenterType: workCentersTable.workCenterType,
+        capacity: workCentersTable.capacity,
+        areaName: areasTable.name,
+        twinState: workCentersTable.twinState,
+      })
+      .from(workCentersTable)
+      .innerJoin(areasTable, eq(workCentersTable.areaId, areasTable.id)),
+    db.select().from(operationSegmentsTable),
+    db.select().from(personnelClassesTable),
+    db.select().from(operationsRequestsTable),
   ]);
+
+  // Build engineId lookup for operation segments (stored on request, not segment)
+  const engineByRequestId = new Map(
+    operationsRequestRows.map((r) => [r.id, r.engineId]),
+  );
+
+  const workCentres: GraphWorkCentre[] = workCentreRows;
+
+  const operationSegments: GraphOperationSegment[] = operationSegmentRows.map(
+    (s) => ({
+      id: s.id,
+      operationsRequestId: s.operationsRequestId,
+      engineId: engineByRequestId.get(s.operationsRequestId) ?? "unknown",
+      sourceTcn: s.sourceTcn,
+      sequenceNumber: s.sequenceNumber,
+      segmentStatus: s.segmentStatus,
+      assignedWorkCenterId: s.assignedWorkCenterId,
+      twinState: s.twinState,
+    }),
+  );
+
+  const personnelClasses: GraphPersonnelClass[] = personnelClassRows.map(
+    (p) => ({
+      id: p.id,
+      classCode: p.classCode,
+      name: p.name,
+    }),
+  );
+
   return [
     engineRows.map((e) => toEngine(e, 0)),
     recRows.map(toRecommendation),
@@ -320,6 +376,10 @@ async function loadGraphInputs() {
     llpRows.map(toEngineLlp),
     wpTasks,
     latestReadingRows.map(toReading),
+    new Date(),
+    workCentres,
+    operationSegments,
+    personnelClasses,
   ] as const;
 }
 

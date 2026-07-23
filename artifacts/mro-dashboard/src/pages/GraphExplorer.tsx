@@ -18,7 +18,7 @@ import { useQueryClient } from '@tanstack/react-query';
  * ComplianceAssessment) share a warm palette so time-bound events read
  * distinctly from structural/design nodes.
  */
-const NODE_STYLE: Record<string, { background: string; color: string; group: 'asset' | 'event' | 'compliance' | 'other' }> = {
+const NODE_STYLE: Record<string, { background: string; color: string; group: 'asset' | 'event' | 'compliance' | 'isa95' | 'other' }> = {
   Engine: { background: '#0f62fe', color: '#fff', group: 'asset' },
   EngineModule: { background: '#d0e2ff', color: '#161616', group: 'asset' },
   Component: { background: '#8a3ffc', color: '#fff', group: 'asset' },
@@ -33,6 +33,10 @@ const NODE_STYLE: Record<string, { background: string; color: string; group: 'as
   ComplianceDirective: { background: '#da1e28', color: '#fff', group: 'compliance' },
   ComplianceAssessment: { background: '#ffd7d9', color: '#161616', group: 'compliance' },
   MaintenanceRecommendation: { background: '#24a148', color: '#fff', group: 'other' },
+  // ISA-95 Equipment Hierarchy & Execution
+  WorkCenter: { background: '#005d5d', color: '#fff', group: 'isa95' },
+  OperationSegment: { background: '#9ef0f0', color: '#161616', group: 'isa95' },
+  PersonnelClass: { background: '#007d79', color: '#fff', group: 'isa95' },
 };
 
 const LEGEND: { label: string; types: string[]; color: string }[] = [
@@ -44,6 +48,9 @@ const LEGEND: { label: string; types: string[]; color: string }[] = [
   { label: 'Directive', types: ['ComplianceDirective'], color: '#da1e28' },
   { label: 'Compliance assessment', types: ['ComplianceAssessment'], color: '#ffd7d9' },
   { label: 'Recommendation', types: ['MaintenanceRecommendation'], color: '#24a148' },
+  { label: 'Work Centre (ISA-95)', types: ['WorkCenter'], color: '#005d5d' },
+  { label: 'Operation Segment (ISA-95)', types: ['OperationSegment'], color: '#9ef0f0' },
+  { label: 'Personnel Class (ISA-95)', types: ['PersonnelClass'], color: '#007d79' },
 ];
 
 const TYPE_FILTER_OPTIONS = [
@@ -58,6 +65,10 @@ const TYPE_FILTER_OPTIONS = [
   'MaintenanceRecommendation',
   'ServiceRequest',
   'LifeLimitedPart',
+  // ISA-95
+  'WorkCenter',
+  'OperationSegment',
+  'PersonnelClass',
 ];
 
 export default function GraphExplorer() {

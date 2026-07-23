@@ -24,6 +24,35 @@ export interface GraphFilter {
  * Nodes carry an ontology class id in `type`; edges use ontology relationship ids
  * as labels, giving end-to-end traceability from engines to recommendations.
  */
+/** Minimal ISA-95 Work Centre shape needed for graph projection. */
+export interface GraphWorkCentre {
+  id: string;
+  name: string;
+  workCenterType: string;
+  capacity: number;
+  areaName: string;
+  twinState: string;
+}
+
+/** Minimal ISA-95 Operation Segment shape needed for graph projection. */
+export interface GraphOperationSegment {
+  id: string;
+  operationsRequestId: string;
+  engineId: string;
+  sourceTcn: string | null;
+  sequenceNumber: number;
+  segmentStatus: string;
+  assignedWorkCenterId: string | null;
+  twinState: string;
+}
+
+/** Minimal ISA-95 Personnel Class shape needed for graph projection. */
+export interface GraphPersonnelClass {
+  id: string;
+  classCode: string;
+  name: string;
+}
+
 export function buildGraph(
   engines: Engine[],
   recommendations: Recommendation[],
@@ -35,6 +64,12 @@ export function buildGraph(
   latestReadings: ParameterReading[] = [],
   /** Assessment time for derived compliance statuses. */
   now: Date = new Date(),
+  /** ISA-95 Equipment Hierarchy work centres. */
+  workCentres: GraphWorkCentre[] = [],
+  /** ISA-95 Operation Segments (one per TCN task in an operations request). */
+  operationSegments: GraphOperationSegment[] = [],
+  /** ISA-95 Personnel Classes (skill/qualification types). */
+  personnelClasses: GraphPersonnelClass[] = [],
 ): GraphData {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
@@ -650,6 +685,138 @@ export function buildGraph(
         source: tsrId,
         target: commitId,
         label: "acknowledgedBy",
+      });
+    }
+  }
+
+  // ── ISA-95 Equipment Hierarchy: Work Centres ──────────────────────────
+  for (const wc of workCentres) {
+    const wcId = `wc:${wc.id}`;
+    addNode({
+      id: wcId,
+      type: "WorkCenter",
+      label: `${wc.name} (${wc.workCenterType})`,
+      properties: {
+        workCentreId: wc.id,
+        name: wc.name,
+        workCenterType: wc.workCenterType,
+        capacity: wc.capacity,
+        areaName: wc.areaName,
+        twinState: wc.twinState,
+      },
+    });
+  }
+
+  // ── ISA-95 Personnel Classes ───────────────────────────────────────────
+  for (const pc of personnelClasses) {
+    const pcId = `personnel-class:${pc.id}`;
+    addNode({
+      id: pcId,
+      type: "PersonnelClass",
+      label: pc.name,
+      properties: {
+        personnelClassId: pc.id,
+        classCode: pc.classCode,
+        name: pc.name,
+      },
+    });
+  }
+
+  // ── ISA-95 Operation Segments ─────────────────────────────────────────
+  // Group by operations-request so we can emit the request node once.
+  const segmentsByRequest = new Map<string, GraphOperationSegment[]>();
+  for (const seg of operationSegments) {
+    const list = segmentsByRequest.get(seg.operationsRequestId) ?? [];
+    list.push(seg);
+    segmentsByRequest.set(seg.operationsRequestId, list);
+  }
+
+  for (const [requestId, segs] of segmentsByRequest) {
+    const firstSeg = segs[0];
+    const engId = `engine:${firstSeg.engineId}`;
+
+    for (const seg of segs) {
+      const segId = `opseg:${seg.id}`;
+      addNode({
+        id: segId,
+        type: "OperationSegment",
+        label: seg.sourceTcn
+          ? `${seg.sourceTcn} · ${seg.segmentStatus}`
+          : `Segment #${seg.sequenceNumber} · ${seg.segmentStatus}`,
+        properties: {
+          operationSegmentId: seg.id,
+          operationsRequestId: requestId,
+          engineId: seg.engineId,
+          sourceTcn: seg.sourceTcn,
+          sequenceNumber: seg.sequenceNumber,
+          segmentStatus: seg.segmentStatus,
+          twinState: seg.twinState,
+        },
+      });
+
+      // OperationSegment → Engine (covers)
+      if (nodeIds.has(engId)) {
+        addEdge({
+          id: `e:opseg:${seg.id}:covers`,
+          source: segId,
+          target: engId,
+          label: "covers",
+        });
+      }
+
+      // OperationSegment → WorkCenter (assignedTo)
+      if (seg.assignedWorkCenterId) {
+        const wcId = `wc:${seg.assignedWorkCenterId}`;
+        if (nodeIds.has(wcId)) {
+          addEdge({
+            id: `e:opseg:${seg.id}:assignedTo`,
+            source: segId,
+            target: wcId,
+            label: "assignedTo",
+          });
+        }
+      }
+
+      // Mirror TCN node linkage: OperationSegment → MaintenanceTaskExecution
+      if (seg.sourceTcn && nodeIds.has(`tcn:${seg.sourceTcn}`)) {
+        addEdge({
+          id: `e:opseg:${seg.id}:mirrorsTcn`,
+          source: segId,
+          target: `tcn:${seg.sourceTcn}`,
+          label: "mirrorsTcn",
+        });
+      }
+    }
+  }
+
+  // Engine → WorkCenter (currentlyAt) when any segment is active in that centre.
+  // A work centre "holds" the engine while at least one of its segments is
+  // IN_PROGRESS / HOLD_SKILL / HOLD_MATERIAL / HOLD_EQUIPMENT.
+  const ACTIVE_SEG_STATUSES = new Set([
+    "IN_PROGRESS",
+    "HOLD_SKILL",
+    "HOLD_MATERIAL",
+    "HOLD_EQUIPMENT",
+    "READY",
+  ]);
+  const engineAtWc = new Map<string, string>(); // engineId → wcId
+  for (const seg of operationSegments) {
+    if (
+      seg.assignedWorkCenterId &&
+      ACTIVE_SEG_STATUSES.has(seg.segmentStatus) &&
+      !engineAtWc.has(seg.engineId)
+    ) {
+      engineAtWc.set(seg.engineId, `wc:${seg.assignedWorkCenterId}`);
+    }
+  }
+  for (const [engineId, wcId] of engineAtWc) {
+    const engNodeId = `engine:${engineId}`;
+    if (nodeIds.has(engNodeId) && nodeIds.has(wcId)) {
+      addEdge({
+        id: `e:${engineId}:currentlyAt`,
+        source: engNodeId,
+        target: wcId,
+        label: "currentlyAt",
       });
     }
   }
