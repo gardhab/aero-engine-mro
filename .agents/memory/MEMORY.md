@@ -1,3 +1,6 @@
 - [Kùzu on Nix + pnpm](kuzu-on-nix.md) — native graph module works, but needs onlyBuiltDependencies allowlist + esbuild external + a possibly-manual install.js prebuild.
 - [Carbon Sass theme config](carbon-theme-config.md) — pass the theme map `themes.$g10`, not the string `'g10'`; `$use-font-face`/`$font-path` are not overridable in the installed version.
 - [Graph projection migrations](graph-projection-migrations.md) — graph merge never deletes: retargeted/relabeled edges need an explicit prune (merge does refresh non-corrected node types/props in place); ontology restructures migrate via rename maps to keep SME edits.
+- [ISA-95 type discriminant](isa95-type-discriminant.md) — PhysicalAsset._type must be `string` (not the literal "PhysicalAsset") or sub-interfaces like ISA95Engine cannot override it with their own literal.
+- [ISA-95 TCN bridge](isa95-tcn-bridge.md) — OperationsRequest/OperationSegment mirror WorkPackage/WorkPackageTask; created in ensureOperationsRequestForWorkPackage() and kept in sync by syncSegmentStatus(); never run parallel duplicate systems.
+- [mro-core test runner](mro-core-test-runner.md) — uses `tsx --test test/*.test.ts` (Node.js built-in runner); tests live in lib/mro-core/test/, NOT src/; use `node:test` + `node:assert`, not jest/mocha globals.
