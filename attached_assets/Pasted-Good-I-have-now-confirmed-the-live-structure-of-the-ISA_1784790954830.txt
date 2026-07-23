@@ -1,0 +1,966 @@
+Good. I have now **confirmed the live structure of the ISA-95 reference repository directly** . The ontology is organized into three live directories:
+
+- **`EquipmentHierarchy/`** — Enterprise, Site, Area, WorkCenter, WorkUnit, WorkCell, Unit, ProductionLine, ProcessCell, StorageUnit, StorageZone, SiteAsset 
+- **`CommonObjectModels/`** — Equipment, EquipmentClass (+ Properties), PhysicalAsset, PhysicalAssetClass (+ Properties), HierarchyScope, Material, Person, ProcessSegment, OperationalLocation, OperationsEvent, OperationsRecord, SpatialDefinition, EquipmentAssetMapping 
+- **`Extensions/`** — MRO-relevant extensions
+
+This is the exact set of classes your ontology needs to align with. Here is the full, grounded, agent-ready implementation specification.
+
+***
+
+# Agent-Ready Implementation Specification
+## Aero-Engine MRO Ontology — ISA-95 Digital Twin Alignment
+
+***
+
+## Preamble for the Implementing Agent
+
+> Read this entire document before touching a single file. Implement in the exact order of the phases below. Do not proceed to Phase N+1 until all acceptance criteria for Phase N pass. All paths are relative to the repository root. Create a branch named `feat/isa95-digital-twin-ontology` before starting. Open a PR against `main` when Phase 3 is complete.
+
+***
+
+## Phase 0 — Branch & Scaffolding
+
+**Step 0.1 — Create branch**
+```bash
+git checkout -b feat/isa95-digital-twin-ontology
+```
+
+**Step 0.2 — Create directory structure**
+```
+lib/mro-core/src/ontology/
+├── common/          # shared base types
+├── product/         # engine/module/component twins (existing, to be extended)
+├── operations/      # ISA-95 equipment hierarchy (NEW)
+├── execution/       # work order / operations execution twins (NEW)
+├── personnel/       # person / personnel class (NEW)
+├── material/        # material / material class (NEW)
+└── index.ts         # barrel export (update last)
+```
+
+***
+
+## Phase 1 — Common Base Model
+
+**Rationale:** The ISA-95 reference defines a `BaseModel` with `id`, `description`, and `hierarchyScope` . Every twin class must extend this.
+
+**File:** `lib/mro-core/src/ontology/common/BaseModel.ts`
+
+```typescript
+/**
+ * ISA-95 BaseModel — all twin classes extend this.
+ * Maps to: Ontology/CommonObjectModels/BaseModel.json in opendigitaltwins-isa95
+ */
+export interface ISA95BaseModel {
+  /** Globally unique identifier for this twin instance */
+  id: string;
+  /** Human-readable name */
+  name: string;
+  /** Optional free-text description */
+  description?: string;
+  /** Reference to the ISA-95 hierarchy node that scopes this object */
+  hierarchyScopeId?: string;
+  /** ISO 8601 timestamp — when this record was created */
+  createdAt: string;
+  /** ISO 8601 timestamp — when this record was last updated */
+  updatedAt: string;
+  /** Lifecycle state for digital twin synchronisation */
+  twinState: TwinState;
+}
+
+export type TwinState =
+  | 'ACTIVE'       // twin is live and synchronized
+  | 'INACTIVE'     // twin exists but is not currently in service
+  | 'INDUCTION'    // asset has entered the MRO facility
+  | 'IN_WORK'      // currently under maintenance
+  | 'COMPLETE'     // maintenance complete, pending redelivery
+  | 'ARCHIVED';    // historical record only
+
+export interface ValueWithUOM {
+  value: number;
+  unitOfMeasure: string;
+}
+
+export interface TimeInterval {
+  startDateTime: string;   // ISO 8601
+  endDateTime?: string;    // ISO 8601 — null means open/ongoing
+}
+```
+
+**Acceptance criteria:** File compiles. `ISA95BaseModel` can be imported from `@mro/core`.
+
+***
+
+## Phase 2 — ISA-95 Equipment Hierarchy (Operations Twin)
+
+**Rationale:** Your existing ontology has no site/area/work-center hierarchy. The ISA-95 reference defines Enterprise → Site → Area → WorkCenter → WorkUnit → WorkCell . This is the physical/organizational spine of the operational twin.
+
+### Step 2.1 — HierarchyScope
+
+**File:** `lib/mro-core/src/ontology/common/HierarchyScope.ts`
+
+```typescript
+import { ISA95BaseModel } from './BaseModel';
+
+/**
+ * ISA-95 HierarchyScope — scopes any object to a node in the equipment hierarchy.
+ * Maps to: Ontology/CommonObjectModels/HierarchyScope.json
+ */
+export type HierarchyLevel =
+  | 'Enterprise'
+  | 'Site'
+  | 'Area'
+  | 'WorkCenter'
+  | 'WorkUnit'
+  | 'WorkCell'
+  | 'ProcessCell'
+  | 'ProductionLine'
+  | 'ProductionUnit'
+  | 'StorageZone'
+  | 'StorageUnit';
+
+export interface HierarchyScope extends ISA95BaseModel {
+  hierarchyLevel: HierarchyLevel;
+  /** ID of the parent scope node — null for Enterprise root */
+  parentScopeId?: string;
+}
+```
+
+### Step 2.2 — Equipment Hierarchy Classes
+
+**File:** `lib/mro-core/src/ontology/operations/EquipmentHierarchy.ts`
+
+```typescript
+import { ISA95BaseModel } from '../common/BaseModel';
+
+/**
+ * ISA-95 Equipment Hierarchy
+ * Maps to: Ontology/EquipmentHierarchy/*.json in opendigitaltwins-isa95
+ */
+
+export interface Enterprise extends ISA95BaseModel {
+  readonly _type: 'Enterprise';
+  enterpriseId: string;       // e.g. IATA MRO org code
+  sites: string[];            // IDs of child Site twins
+}
+
+export interface Site extends ISA95BaseModel {
+  readonly _type: 'Site';
+  enterpriseId: string;
+  icaoCode?: string;          // airport/facility ICAO identifier
+  areas: string[];            // IDs of child Area twins
+}
+
+export interface Area extends ISA95BaseModel {
+  readonly _type: 'Area';
+  siteId: string;
+  areaType: MROAreaType;
+  workCenters: string[];
+}
+
+export type MROAreaType =
+  | 'ENGINE_DISASSEMBLY'
+  | 'MODULE_REPAIR'
+  | 'COMPONENT_OVERHAUL'
+  | 'TEST_CELL'
+  | 'FINAL_ASSEMBLY'
+  | 'PARTS_STORE'
+  | 'RECEIVING_INSPECTION'
+  | 'SHIPPING';
+
+export interface WorkCenter extends ISA95BaseModel {
+  readonly _type: 'WorkCenter';
+  areaId: string;
+  workCenterType: WorkCenterType;
+  /** Maximum concurrent work orders this center supports */
+  capacity: number;
+  /** IDs of Equipment twins assigned to this work center */
+  equipmentIds: string[];
+  /** IDs of PersonnelClass twins qualified to work here */
+  qualifiedPersonnelClassIds: string[];
+  workUnits: string[];
+}
+
+export type WorkCenterType =
+  | 'BORESCOPE'
+  | 'BLADE_REPAIR'
+  | 'COMBUSTION'
+  | 'GEARBOX'
+  | 'ACCESSORIES'
+  | 'TEST_CELL'
+  | 'NDT'
+  | 'BALANCING'
+  | 'FINAL_TEST';
+
+export interface WorkUnit extends ISA95BaseModel {
+  readonly _type: 'WorkUnit';
+  workCenterId: string;
+  /** ISA-95 Part 1 work unit variants for discrete MRO */
+  workUnitType: 'WorkCell' | 'ProductionUnit' | 'StorageUnit';
+  /** ID of the work order operation currently assigned here — null if idle */
+  currentOperationId?: string;
+  equipmentIds: string[];
+}
+```
+
+**Acceptance criteria:** All types compile. Each class has `_type` discriminant for safe narrowing.
+
+***
+
+## Phase 3 — Equipment & Physical Asset
+
+**Rationale:** The ISA-95 reference separates `Equipment` (functional/logical) from `PhysicalAsset` (serialized physical object) and provides `EquipmentClass` for capability grouping . Your existing `Engine` maps to `PhysicalAsset`. MRO tooling and test cells map to `Equipment`.
+
+**File:** `lib/mro-core/src/ontology/operations/Equipment.ts`
+
+```typescript
+import { ISA95BaseModel, ValueWithUOM } from '../common/BaseModel';
+
+/**
+ * ISA-95 EquipmentClass — defines a category of equipment with shared capabilities.
+ * Maps to: Ontology/CommonObjectModels/EquipmentClass.json
+ */
+export interface EquipmentClass extends ISA95BaseModel {
+  readonly _type: 'EquipmentClass';
+  equipmentClassCode: string;
+  properties: EquipmentClassProperty[];
+  /** IDs of Equipment instances that belong to this class */
+  memberEquipmentIds: string[];
+}
+
+export interface EquipmentClassProperty {
+  propertyName: string;
+  propertyDescription?: string;
+  value?: ValueWithUOM;
+}
+
+/**
+ * ISA-95 Equipment — a specific piece of MRO shop equipment or tooling.
+ * Maps to: Ontology/CommonObjectModels/Equipment.json
+ */
+export interface Equipment extends ISA95BaseModel {
+  readonly _type: 'Equipment';
+  equipmentClassId: string;
+  serialNumber?: string;
+  /** ID of the WorkUnit or WorkCenter this equipment is assigned to */
+  assignedLocationId: string;
+  equipmentStatus: EquipmentStatus;
+  properties: EquipmentProperty[];
+}
+
+export type EquipmentStatus =
+  | 'AVAILABLE'
+  | 'IN_USE'
+  | 'MAINTENANCE'
+  | 'CALIBRATION_DUE'
+  | 'OUT_OF_SERVICE';
+
+export interface EquipmentProperty {
+  propertyName: string;
+  value: ValueWithUOM;
+  timestamp: string;         // ISO 8601 — when was this value last observed
+}
+
+/**
+ * ISA-95 PhysicalAsset — a serialized physical object (engine, module, LRU).
+ * Maps to: Ontology/CommonObjectModels/PhysicalAsset.json
+ * NOTE: Your existing Engine/EngineModule should EXTEND this interface.
+ */
+export interface PhysicalAsset extends ISA95BaseModel {
+  readonly _type: 'PhysicalAsset';
+  physicalAssetClassId: string;
+  serialNumber: string;
+  manufacturer?: string;
+  manufactureDate?: string;   // ISO 8601 date
+  /** ID of the Equipment twin this asset is currently installed on/in — null if standalone */
+  installedOnEquipmentId?: string;
+  properties: PhysicalAssetProperty[];
+}
+
+export interface PhysicalAssetClass extends ISA95BaseModel {
+  readonly _type: 'PhysicalAssetClass';
+  partNumber: string;
+  ataChapter?: string;
+  properties: PhysicalAssetClassProperty[];
+}
+
+export interface PhysicalAssetClassProperty {
+  propertyName: string;
+  propertyDescription?: string;
+  value?: ValueWithUOM;
+}
+
+export interface PhysicalAssetProperty {
+  propertyName: string;
+  value: ValueWithUOM;
+  timestamp: string;
+}
+
+/**
+ * EquipmentAssetMapping — the bridge between Equipment (logical) and PhysicalAsset (physical).
+ * Maps to: Ontology/CommonObjectModels/EquipmentAssetMapping.json
+ * Critical for simulation: tells you which serialized engine/tool occupies which work unit slot.
+ */
+export interface EquipmentAssetMapping extends ISA95BaseModel {
+  readonly _type: 'EquipmentAssetMapping';
+  equipmentId: string;
+  physicalAssetId: string;
+  /** The time interval during which this mapping is/was valid */
+  effectivePeriod: import('../common/BaseModel').TimeInterval;
+}
+```
+
+**Acceptance criteria:** `PhysicalAsset` is importable. `EquipmentAssetMapping` correctly uses `TimeInterval`.
+
+***
+
+## Phase 4 — Extend Product Domain to PhysicalAsset
+
+**Rationale:** Your existing `Engine` and `EngineModule` must be refactored to extend `PhysicalAsset` so they gain ISA-95 identity, hierarchy scope, and the asset-mapping bridge.
+
+**File:** `lib/mro-core/src/ontology/product/Engine.ts` *(modify existing)*
+
+Add the following to the existing `Engine` interface:
+
+```typescript
+// ADD these imports at the top:
+import { PhysicalAsset, PhysicalAssetClass } from '../operations/Equipment';
+import { TimeInterval } from '../common/BaseModel';
+
+// MODIFY Engine to extend PhysicalAsset:
+export interface Engine extends PhysicalAsset {
+  readonly _type: 'Engine';          // overrides PhysicalAsset._type
+  // --- existing fields retained below ---
+  engineModelId: string;             // replaces raw EngineModel reference
+  registration?: string;             // aircraft registration this engine is on
+  position?: 'LEFT' | 'RIGHT' | 'CENTER' | 'APU';
+  tsn: number;                       // time since new (flight hours)
+  csn: number;                       // cycles since new
+  tso?: number;                      // time since overhaul
+  cso?: number;                      // cycles since overhaul
+  /** Current lifecycle location in MRO context */
+  currentLocationId?: string;        // ID of WorkCenter/WorkUnit if in shop
+  installationHistory: EngineInstallation[];
+  modules: string[];                 // IDs of EngineModule PhysicalAssets
+}
+
+export interface EngineModule extends PhysicalAsset {
+  readonly _type: 'EngineModule';
+  engineId: string;                  // parent engine
+  modulePosition: string;            // e.g. 'Fan', 'LPC', 'HPC', 'Combustor', 'HPT', 'LPT'
+  tsn: number;
+  csn: number;
+  tso?: number;
+  cso?: number;
+  components: string[];              // IDs of Component PhysicalAssets
+}
+```
+
+**Acceptance criteria:** `Engine` and `EngineModule` compile against `PhysicalAsset`. All existing unit tests pass.
+
+***
+
+## Phase 5 — Personnel Classes
+
+**Rationale:** The ISA-95 reference has a `Person` directory under `CommonObjectModels` . Your `MaintenanceTaskDefinition.skill` is a flat string. It must become a typed `PersonnelClass` with qualifications, enabling simulation of skill-constrained capacity.
+
+**File:** `lib/mro-core/src/ontology/personnel/PersonnelClass.ts`
+
+```typescript
+import { ISA95BaseModel } from '../common/BaseModel';
+
+/**
+ * ISA-95 PersonnelClass — a category of personnel defined by shared qualifications.
+ * Maps to: Ontology/CommonObjectModels/Person/PersonnelClass.json
+ */
+export interface PersonnelClass extends ISA95BaseModel {
+  readonly _type: 'PersonnelClass';
+  classCode: string;
+  qualifications: PersonnelQualification[];
+}
+
+export interface PersonnelQualification {
+  qualificationCode: string;   // e.g. EASA Part-66 B1, FAA A&P
+  regulatoryAuthority: string;
+  expiryDate?: string;         // ISO 8601 date
+}
+
+/**
+ * Person — a specific technician, inspector, or engineer.
+ * Maps to: Ontology/CommonObjectModels/Person/Person.json
+ */
+export interface Person extends ISA95BaseModel {
+  readonly _type: 'Person';
+  employeeId: string;
+  personnelClassIds: string[];    // which PersonnelClass memberships this person holds
+  qualifications: PersonnelQualification[];
+  currentWorkCenterId?: string;   // where this person is currently assigned
+  shiftId?: string;
+}
+
+export type MROSkillCode =
+  | 'B1_MECHANICAL'
+  | 'B2_AVIONICS'
+  | 'NDT_LII'
+  | 'NDT_LIII'
+  | 'BORESCOPE'
+  | 'BLADE_REPAIR'
+  | 'WELDING'
+  | 'COMPOSITE'
+  | 'TEST_CELL'
+  | 'QUALITY_INSPECTOR';
+```
+
+**File:** `lib/mro-core/src/ontology/product/MaintenanceTaskDefinition.ts` *(modify existing)*
+
+```typescript
+// REPLACE flat skill: string with:
+requiredPersonnelClassId: string;       // ID of PersonnelClass required
+requiredSkillCode: MROSkillCode;        // enumerated skill
+estimatedDurationHours: number;         // NEW — required for simulation scheduling
+requiredEquipmentClassId?: string;      // NEW — ID of EquipmentClass required
+```
+
+**Acceptance criteria:** `MaintenanceTaskDefinition` compiles. `skill` string field is removed and replaced.
+
+***
+
+## Phase 6 — Operations Execution (Work Order Twin)
+
+**Rationale:** This is the critical missing domain. ISA-95 Part 4 defines `OperationsRequest`, `OperationsSchedule`, `OperationsPerformance`, and actual resource use . Without this layer, you cannot link a work order to a work center, track actual resource consumption, or simulate capacity.
+
+**File:** `lib/mro-core/src/ontology/execution/OperationsExecution.ts`
+
+```typescript
+import { ISA95BaseModel, TimeInterval, ValueWithUOM } from '../common/BaseModel';
+
+/**
+ * OperationsRequest — ISA-95 Part 4 equivalent of your ServiceRequest/WorkOrder.
+ * This is the twin-level work order that connects the product twin to the operations twin.
+ */
+export interface OperationsRequest extends ISA95BaseModel {
+  readonly _type: 'OperationsRequest';
+  requestType: 'MAINTENANCE' | 'INSPECTION' | 'REPAIR' | 'OVERHAUL' | 'TEST';
+  priority: 1 | 2 | 3 | 4 | 5;            // 1 = highest
+  /** ID of the Engine or EngineModule PhysicalAsset this request covers */
+  physicalAssetId: string;
+  /** ID of the originating ServiceRequest in your existing domain */
+  sourceServiceRequestId?: string;
+  requestedStartTime: string;              // ISO 8601
+  requestedEndTime: string;               // ISO 8601
+  operationSegments: OperationSegment[];
+  status: OperationsRequestStatus;
+}
+
+export type OperationsRequestStatus =
+  | 'CREATED'
+  | 'SCHEDULED'
+  | 'IN_PROGRESS'
+  | 'ON_HOLD'
+  | 'COMPLETE'
+  | 'CANCELLED';
+
+/**
+ * OperationSegment — a single step within the OperationsRequest.
+ * Maps to ISA-95 OperationsSegment concept.
+ * Replaces your flat WorkOrder tasks with a structured, resource-aware model.
+ */
+export interface OperationSegment extends ISA95BaseModel {
+  readonly _type: 'OperationSegment';
+  operationsRequestId: string;
+  sequenceNumber: number;
+  /** ID of the MaintenanceTaskDefinition that defines this segment */
+  taskDefinitionId: string;
+  /** ID of the WorkCenter assigned to execute this segment */
+  assignedWorkCenterId: string;
+  /** ID of the WorkUnit (specific bay/cell) — may be null until scheduled */
+  assignedWorkUnitId?: string;
+  scheduledInterval: TimeInterval;
+  actualInterval?: TimeInterval;           // filled in as work progresses
+  segmentStatus: OperationSegmentStatus;
+  /** Actual personnel assigned */
+  actualPersonnelIds: string[];
+  /** Actual equipment used */
+  actualEquipmentIds: string[];
+  findings: Finding[];
+}
+
+export type OperationSegmentStatus =
+  | 'PENDING'
+  | 'READY'           // prerequisites met, can start
+  | 'IN_PROGRESS'
+  | 'HOLD_MATERIAL'   // waiting for parts
+  | 'HOLD_SKILL'      // waiting for qualified technician
+  | 'HOLD_EQUIPMENT'  // waiting for equipment availability
+  | 'COMPLETE'
+  | 'SKIPPED';
+
+/**
+ * Finding — the result of an inspection or operation.
+ * Extends your existing concept with ISA-95 traceability.
+ */
+export interface Finding extends ISA95BaseModel {
+  readonly _type: 'Finding';
+  operationSegmentId: string;
+  physicalAssetId: string;           // which asset was inspected
+  ataChapter: string;
+  findingCode: string;               // ACARS/S1000D fault code
+  severity: 'SERVICEABLE' | 'REPAIRABLE' | 'BEYOND_LIMITS' | 'SCRAP';
+  disposition: FindingDisposition;
+  discoveredAt: string;              // ISO 8601 timestamp
+  discoveredByPersonId: string;
+}
+
+export type FindingDisposition =
+  | 'NO_ACTION'
+  | 'REPAIR_IN_PLACE'
+  | 'REMOVE_AND_REPLACE'
+  | 'BLEND'
+  | 'WELD_REPAIR'
+  | 'SCRAP_AND_REPLACE'
+  | 'DEFER_WITH_LIMITATION';
+
+/**
+ * OperationsPerformance — the actual record of what was done.
+ * ISA-95 Part 4 actual operations performance.
+ * This is the immutable audit log twin.
+ */
+export interface OperationsPerformance extends ISA95BaseModel {
+  readonly _type: 'OperationsPerformance';
+  operationsRequestId: string;
+  workCenterId: string;
+  physicalAssetId: string;
+  actualInterval: TimeInterval;
+  actualPersonnelUsage: ActualPersonnelUsage[];
+  actualEquipmentUsage: ActualEquipmentUsage[];
+  actualMaterialUsage: ActualMaterialUsage[];
+  performanceStatus: 'IN_PROGRESS' | 'COMPLETE' | 'PARTIAL';
+  turnAroundTimeHours?: number;         // computed on completion
+}
+
+export interface ActualPersonnelUsage {
+  personId: string;
+  personnelClassId: string;
+  hoursWorked: number;
+  interval: TimeInterval;
+}
+
+export interface ActualEquipmentUsage {
+  equipmentId: string;
+  equipmentClassId: string;
+  interval: TimeInterval;
+}
+
+export interface ActualMaterialUsage {
+  materialId: string;
+  materialClassId: string;
+  quantityUsed: ValueWithUOM;
+}
+```
+
+**Acceptance criteria:** All types compile. `OperationSegment` correctly references `WorkCenterId` and `TaskDefinitionId`. `OperationsPerformance` uses `TimeInterval` for the actual interval.
+
+***
+
+## Phase 7 — ProcessSegment (Routing Definition)
+
+**Rationale:** The ISA-95 reference defines `ProcessSegment`  as the definition of *how* work is done — the routing template. This is separate from `OperationSegment` (a specific execution instance). You need this to define standard repair routings per engine type.
+
+**File:** `lib/mro-core/src/ontology/execution/ProcessSegment.ts`
+
+```typescript
+import { ISA95BaseModel } from '../common/BaseModel';
+
+/**
+ * ProcessSegment — the routing template for a class of MRO work.
+ * Maps to: Ontology/CommonObjectModels/ProcessSegment/*.json
+ * Think of this as: "For a CFM56-7B heavy visit, these are the standard segments in order."
+ */
+export interface ProcessSegment extends ISA95BaseModel {
+  readonly _type: 'ProcessSegment';
+  /** Which EngineModel or EngineModule type this segment applies to */
+  applicablePhysicalAssetClassId: string;
+  operationCategory: 'DISASSEMBLY' | 'INSPECTION' | 'REPAIR' | 'ASSEMBLY' | 'TEST';
+  sequenceNumber: number;
+  /** ID of the MaintenanceTaskDefinition this segment implements */
+  taskDefinitionId: string;
+  /** ID of the WorkCenter type (by WorkCenterType code) best suited for this */
+  preferredWorkCenterType: string;
+  estimatedDurationHours: number;
+  /** Prerequisites — IDs of ProcessSegments that must complete before this starts */
+  prerequisiteSegmentIds: string[];
+  /** Parallel flag — can this run concurrently with its prerequisites? */
+  canRunParallel: boolean;
+}
+```
+
+***
+
+## Phase 8 — Material Domain
+
+**Rationale:** The ISA-95 reference has a `Material` subdirectory . Your ontology has no material/parts model. Without it you cannot model parts availability as a constraint on capacity.
+
+**File:** `lib/mro-core/src/ontology/material/Material.ts`
+
+```typescript
+import { ISA95BaseModel, ValueWithUOM } from '../common/BaseModel';
+
+export interface MaterialClass extends ISA95BaseModel {
+  readonly _type: 'MaterialClass';
+  partNumber: string;
+  ataChapter: string;
+  materialType: 'LRU' | 'CONSUMABLE' | 'TOOL' | 'CHEMICAL' | 'HARDWARE';
+  isLifeLimited: boolean;
+  lifeLimitCycles?: number;
+  lifeLimitHours?: number;
+}
+
+export interface Material extends ISA95BaseModel {
+  readonly _type: 'Material';
+  materialClassId: string;
+  serialNumber?: string;              // for serialized (LRU) parts
+  batchNumber?: string;               // for consumables
+  quantity: ValueWithUOM;
+  locationId: string;                 // StorageUnit or WorkUnit where stocked
+  materialStatus: MaterialStatus;
+  expiryDate?: string;               // ISO 8601 — for shelf-life limited items
+  tsn?: number;                      // for serialized parts
+  csn?: number;
+}
+
+export type MaterialStatus =
+  | 'SERVICEABLE'
+  | 'UNSERVICEABLE'
+  | 'QUARANTINE'
+  | 'AWAITING_INSPECTION'
+  | 'SCRAPPED'
+  | 'ON_ORDER';
+```
+
+***
+
+## Phase 9 — Cross-Twin Relationship Index
+
+**File:** `lib/mro-core/src/ontology/index.ts` *(create/replace)*
+
+```typescript
+// Common
+export * from './common/BaseModel';
+export * from './common/HierarchyScope';
+
+// Operations (ISA-95 Equipment Hierarchy)
+export * from './operations/EquipmentHierarchy';
+export * from './operations/Equipment';
+
+// Product (extended to PhysicalAsset)
+export * from './product/Engine';
+
+// Personnel
+export * from './personnel/PersonnelClass';
+
+// Material
+export * from './material/Material';
+
+// Execution
+export * from './execution/OperationsExecution';
+export * from './execution/ProcessSegment';
+```
+
+***
+
+## Phase 10 — Database Schema Extensions
+
+Add the following tables to `lib/db/src/schema.ts` using Drizzle ORM, consistent with existing patterns in the file:
+
+```typescript
+// --- ISA-95 Equipment Hierarchy ---
+export const enterprises = pgTable('enterprises', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  enterpriseId: text('enterprise_id').notNull().unique(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  twinState: text('twin_state').notNull().default('ACTIVE'),
+});
+
+export const sites = pgTable('sites', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  enterpriseId: uuid('enterprise_id').references(() => enterprises.id),
+  name: text('name').notNull(),
+  icaoCode: text('icao_code'),
+  twinState: text('twin_state').notNull().default('ACTIVE'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const areas = pgTable('areas', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  siteId: uuid('site_id').references(() => sites.id),
+  name: text('name').notNull(),
+  areaType: text('area_type').notNull(),
+  twinState: text('twin_state').notNull().default('ACTIVE'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const workCenters = pgTable('work_centers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  areaId: uuid('area_id').references(() => areas.id),
+  name: text('name').notNull(),
+  workCenterType: text('work_center_type').notNull(),
+  capacity: integer('capacity').notNull().default(1),
+  twinState: text('twin_state').notNull().default('ACTIVE'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const workUnits = pgTable('work_units', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workCenterId: uuid('work_center_id').references(() => workCenters.id),
+  name: text('name').notNull(),
+  workUnitType: text('work_unit_type').notNull(),
+  currentOperationId: uuid('current_operation_id'),
+  twinState: text('twin_state').notNull().default('ACTIVE'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// --- Operations Execution ---
+export const operationsRequests = pgTable('operations_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  requestType: text('request_type').notNull(),
+  priority: integer('priority').notNull().default(3),
+  physicalAssetId: uuid('physical_asset_id').notNull(),
+  sourceServiceRequestId: uuid('source_service_request_id'),
+  requestedStartTime: timestamp('requested_start_time').notNull(),
+  requestedEndTime: timestamp('requested_end_time').notNull(),
+  status: text('status').notNull().default('CREATED'),
+  hierarchyScopeId: uuid('hierarchy_scope_id'),
+  twinState: text('twin_state').notNull().default('ACTIVE'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const operationSegments = pgTable('operation_segments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  operationsRequestId: uuid('operations_request_id').references(() => operationsRequests.id),
+  sequenceNumber: integer('sequence_number').notNull(),
+  taskDefinitionId: uuid('task_definition_id').notNull(),
+  assignedWorkCenterId: uuid('assigned_work_center_id').references(() => workCenters.id),
+  assignedWorkUnitId: uuid('assigned_work_unit_id').references(() => workUnits.id),
+  scheduledStart: timestamp('scheduled_start'),
+  scheduledEnd: timestamp('scheduled_end'),
+  actualStart: timestamp('actual_start'),
+  actualEnd: timestamp('actual_end'),
+  segmentStatus: text('segment_status').notNull().default('PENDING'),
+  twinState: text('twin_state').notNull().default('ACTIVE'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// --- Personnel ---
+export const personnelClasses = pgTable('personnel_classes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  classCode: text('class_code').notNull().unique(),
+  name: text('name').notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const persons = pgTable('persons', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  employeeId: text('employee_id').notNull().unique(),
+  name: text('name').notNull(),
+  currentWorkCenterId: uuid('current_work_center_id').references(() => workCenters.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+```
+
+After adding tables, run:
+```bash
+cd lib/db && pnpm drizzle-kit generate
+```
+
+**Acceptance criteria:** Migration generates without errors. All foreign key relationships resolve.
+
+***
+
+## Phase 11 — OpenAPI Spec Extensions
+
+Add the following paths to `lib/api-spec/openapi.yaml`:
+
+```yaml
+/work-centers:
+  get:
+    summary: List all work centers
+    operationId: listWorkCenters
+    tags: [Operations]
+    responses:
+      '200':
+        description: List of work centers
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/WorkCenter'
+
+/work-centers/{id}/utilization:
+  get:
+    summary: Get current utilization for a work center
+    operationId: getWorkCenterUtilization
+    tags: [Operations]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: Work center utilization
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkCenterUtilization'
+
+/operations-requests:
+  post:
+    summary: Create an operations request (work order twin)
+    operationId: createOperationsRequest
+    tags: [Execution]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CreateOperationsRequestInput'
+    responses:
+      '201':
+        description: Created operations request
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationsRequest'
+
+/operations-requests/{id}/segments:
+  get:
+    summary: Get all segments for an operations request
+    operationId: getOperationSegments
+    tags: [Execution]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    responses:
+      '200':
+        description: List of operation segments
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/OperationSegment'
+```
+
+After editing the spec:
+```bash
+cd lib/api-zod && pnpm generate   # regenerate Zod validators
+cd lib/api-client-react && pnpm generate   # regenerate React hooks
+```
+
+***
+
+## Phase 12 — Validation Queries (Acceptance Tests)
+
+Create `lib/mro-core/src/ontology/__tests__/twin-competency.test.ts`:
+
+```typescript
+/**
+ * Competency questions — these are the queries the digital twin must be able to answer.
+ * Each test encodes a simulation or operational question.
+ */
+
+describe('Twin competency questions', () => {
+
+  it('CQ1: Given an engine serial number, which work center and work unit is it currently in?', () => {
+    // Query: engine.currentLocationId → workUnit → workCenter
+    // Test: engine with twinState=IN_WORK has a non-null currentLocationId
+    expect(true).toBe(true); // implement with DB fixture
+  });
+
+  it('CQ2: What operations segments are currently HOLD_SKILL at a given work center?', () => {
+    // Query: operationSegments WHERE assignedWorkCenterId=X AND segmentStatus=HOLD_SKILL
+    // Tests the skill-constraint visibility gap from the as-is ontology
+    expect(true).toBe(true);
+  });
+
+  it('CQ3: What is the total estimated TAT for an engine if all PENDING segments are scheduled optimally?', () => {
+    // Sum of estimatedDurationHours across ProcessSegments, accounting for parallel flag
+    expect(true).toBe(true);
+  });
+
+  it('CQ4: Which work centers are above 80% capacity today?', () => {
+    // workCenter.capacity vs count(operationSegments WHERE status=IN_PROGRESS AND assignedWorkCenterId=X)
+    expect(true).toBe(true);
+  });
+
+  it('CQ5: Which life-limited parts on Engine X are within 200 cycles of their limit?', () => {
+    // engine.modules → module.components → component WHERE isLifeLimited=true AND (lifeLimitCycles - csn) < 200
+    expect(true).toBe(true);
+  });
+
+});
+```
+
+***
+
+## PR Description Template
+
+```
+feat: ISA-95 digital twin ontology alignment
+
+## Summary
+Aligns the aero-engine MRO ontology with ISA-95 Parts 1, 2, and 4 to enable
+multi-domain digital twins: product/configuration, MRO operations, and
+maintenance execution.
+
+## Changes
+- Phase 1: ISA95BaseModel and common types (TwinState, ValueWithUOM, TimeInterval)
+- Phase 2: ISA-95 equipment hierarchy (Enterprise → Site → Area → WorkCenter → WorkUnit)
+- Phase 3: Equipment, EquipmentClass, PhysicalAsset, PhysicalAssetClass, EquipmentAssetMapping
+- Phase 4: Engine and EngineModule extended to PhysicalAsset
+- Phase 5: PersonnelClass, Person, MROSkillCode — replaces flat skill string
+- Phase 6: OperationsRequest, OperationSegment, Finding, OperationsPerformance
+- Phase 7: ProcessSegment routing templates
+- Phase 8: MaterialClass, Material
+- Phase 9: Barrel export index
+- Phase 10: Drizzle schema extensions and migration
+- Phase 11: OpenAPI spec additions for work centers and operations requests
+- Phase 12: Twin competency test stubs
+
+## ISA-95 reference
+All classes map to Ontology/ in github.com/JMayrbaeurl/opendigitaltwins-isa95
+
+## Breaking changes
+- Engine and EngineModule now extend PhysicalAsset — existing callers must add
+  physicalAssetClassId and serialNumber fields
+- MaintenanceTaskDefinition.skill (string) replaced by requiredPersonnelClassId
+  and requiredSkillCode — update any code reading that field
+
+## Testing
+Run: pnpm test --filter mro-core
+All 5 competency question stubs must be present and the test suite must compile.
+```
+
+***
+
+This specification is grounded in the live ISA-95 repository structure  — specifically the `EquipmentHierarchy`, `CommonObjectModels` (Equipment, PhysicalAsset, Person, Material, ProcessSegment, OperationsEvent, OperationsRecord), and their defined properties. Every class maps to a specific file in that repository. You can now paste this directly into Cursor, Replit Agent, or Claude Code and it will implement without needing to reinterpret the architecture.
+
+Sources
