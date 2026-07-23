@@ -2,6 +2,7 @@ export * from "./types.js";
 export * from "./data/parameters.js";
 export * from "./data/synthetic.js";
 export * from "./data/piece-parts.js";
+export * from "./ontology/index.js";
 export * from "./ontology/seed.js";
 export * from "./ontology/turtle.js";
 export * from "./ontology/multiplicity.js";

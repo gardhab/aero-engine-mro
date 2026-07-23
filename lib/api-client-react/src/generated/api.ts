@@ -26,6 +26,7 @@ import type {
   BacktestRun,
   BadRequestResponse,
   ConflictResponse,
+  CreateOperationsRequestInput,
   DashboardSummary,
   Engine,
   EngineHealth,
@@ -52,6 +53,8 @@ import type {
   OntologyTurtle,
   OntologyValidationResult,
   OntologyVersion,
+  OperationSegmentRecord,
+  OperationsRequestRecord,
   ParameterReading,
   PipelineResult,
   ProductionControl,
@@ -66,6 +69,8 @@ import type {
   ShopVisitExchangeSummary,
   UpdateWorkPackageTaskStatusInput,
   ValidationFailedResponse,
+  WorkCentreUtilisation,
+  WorkCentreWithContext,
   WorkPackage
 } from './api.schemas';
 
@@ -1912,6 +1917,308 @@ export function useGetProductionControl<TData = Awaited<ReturnType<typeof getPro
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetProductionControlQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListWorkCentresUrl = () => {
+
+
+
+
+  return `/api/work-centres`
+}
+
+/**
+ * @summary List all ISA-95 work centres with utilisation summary
+ */
+export const listWorkCentres = async ( options?: RequestInit): Promise<WorkCentreWithContext[]> => {
+
+  return customFetch<WorkCentreWithContext[]>(getListWorkCentresUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWorkCentresQueryKey = () => {
+    return [
+    `/api/work-centres`
+    ] as const;
+    }
+
+
+export const getListWorkCentresQueryOptions = <TData = Awaited<ReturnType<typeof listWorkCentres>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWorkCentres>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWorkCentresQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWorkCentres>>> = ({ signal }) => listWorkCentres({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWorkCentres>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListWorkCentresQueryResult = NonNullable<Awaited<ReturnType<typeof listWorkCentres>>>
+export type ListWorkCentresQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all ISA-95 work centres with utilisation summary
+ */
+
+export function useListWorkCentres<TData = Awaited<ReturnType<typeof listWorkCentres>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWorkCentres>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListWorkCentresQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetWorkCentreUtilisationUrl = (id: string,) => {
+
+
+
+
+  return `/api/work-centres/${id}/utilisation`
+}
+
+/**
+ * @summary Detailed utilisation for one work centre
+ */
+export const getWorkCentreUtilisation = async (id: string, options?: RequestInit): Promise<WorkCentreUtilisation> => {
+
+  return customFetch<WorkCentreUtilisation>(getGetWorkCentreUtilisationUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWorkCentreUtilisationQueryKey = (id: string,) => {
+    return [
+    `/api/work-centres/${id}/utilisation`
+    ] as const;
+    }
+
+
+export const getGetWorkCentreUtilisationQueryOptions = <TData = Awaited<ReturnType<typeof getWorkCentreUtilisation>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWorkCentreUtilisation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWorkCentreUtilisationQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorkCentreUtilisation>>> = ({ signal }) => getWorkCentreUtilisation(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWorkCentreUtilisation>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWorkCentreUtilisationQueryResult = NonNullable<Awaited<ReturnType<typeof getWorkCentreUtilisation>>>
+export type GetWorkCentreUtilisationQueryError = ErrorType<void>
+
+
+/**
+ * @summary Detailed utilisation for one work centre
+ */
+
+export function useGetWorkCentreUtilisation<TData = Awaited<ReturnType<typeof getWorkCentreUtilisation>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWorkCentreUtilisation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWorkCentreUtilisationQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateOperationsRequestUrl = () => {
+
+
+
+
+  return `/api/operations-requests`
+}
+
+/**
+ * @summary Create an ISA-95 operations request (work order twin)
+ */
+export const createOperationsRequest = async (createOperationsRequestInput: CreateOperationsRequestInput, options?: RequestInit): Promise<OperationsRequestRecord> => {
+
+  return customFetch<OperationsRequestRecord>(getCreateOperationsRequestUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createOperationsRequestInput)
+  }
+);}
+
+
+
+
+
+export const getCreateOperationsRequestMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOperationsRequest>>, TError,{data: BodyType<CreateOperationsRequestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createOperationsRequest>>, TError,{data: BodyType<CreateOperationsRequestInput>}, TContext> => {
+
+const mutationKey = ['createOperationsRequest'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createOperationsRequest>>, {data: BodyType<CreateOperationsRequestInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createOperationsRequest(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateOperationsRequestMutationResult = NonNullable<Awaited<ReturnType<typeof createOperationsRequest>>>
+    export type CreateOperationsRequestMutationBody = BodyType<CreateOperationsRequestInput>
+    export type CreateOperationsRequestMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create an ISA-95 operations request (work order twin)
+ */
+export const useCreateOperationsRequest = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOperationsRequest>>, TError,{data: BodyType<CreateOperationsRequestInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createOperationsRequest>>,
+        TError,
+        {data: BodyType<CreateOperationsRequestInput>},
+        TContext
+      > => {
+      return useMutation(getCreateOperationsRequestMutationOptions(options));
+    }
+
+export const getGetOperationSegmentsUrl = (id: string,) => {
+
+
+
+
+  return `/api/operations-requests/${id}/segments`
+}
+
+/**
+ * @summary List operation segments for an operations request
+ */
+export const getOperationSegments = async (id: string, options?: RequestInit): Promise<OperationSegmentRecord[]> => {
+
+  return customFetch<OperationSegmentRecord[]>(getGetOperationSegmentsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOperationSegmentsQueryKey = (id: string,) => {
+    return [
+    `/api/operations-requests/${id}/segments`
+    ] as const;
+    }
+
+
+export const getGetOperationSegmentsQueryOptions = <TData = Awaited<ReturnType<typeof getOperationSegments>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOperationSegments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOperationSegmentsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOperationSegments>>> = ({ signal }) => getOperationSegments(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOperationSegments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOperationSegmentsQueryResult = NonNullable<Awaited<ReturnType<typeof getOperationSegments>>>
+export type GetOperationSegmentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List operation segments for an operations request
+ */
+
+export function useGetOperationSegments<TData = Awaited<ReturnType<typeof getOperationSegments>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOperationSegments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOperationSegmentsQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

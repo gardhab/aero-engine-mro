@@ -32,6 +32,7 @@ import {
   ensureTatHistorySeeded,
   ensureWorkPackagesSeeded,
 } from "./work-packages";
+import { ensureEquipmentHierarchySeeded } from "./equipment-hierarchy";
 import { logger } from "../logger";
 
 const SEED_CLASSES_FULL: OntologyClass[] = SEED_CLASSES.map((c) => ({
@@ -63,6 +64,8 @@ async function doSeed(): Promise<void> {
     await ensureWorkPackagesSeeded();
     // Execution history so TAT/production-control metrics are meaningful.
     await ensureTatHistorySeeded();
+    // ISA-95 equipment hierarchy (work centres, personnel classes).
+    await ensureEquipmentHierarchySeeded();
     // Merge (not replace) so any manual graph-node corrections survive restarts.
     await rebuildGraphMerge();
     return;
@@ -162,6 +165,7 @@ async function doSeed(): Promise<void> {
   await ensureExchangeSeeded();
   await ensureWorkPackagesSeeded();
   await ensureTatHistorySeeded();
+  await ensureEquipmentHierarchySeeded();
   await rebuildGraphReplace();
   logger.info("Seeding complete");
 }

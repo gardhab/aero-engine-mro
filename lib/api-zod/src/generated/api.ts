@@ -1249,6 +1249,106 @@ export const GetProductionControlResponse = zod.object({
 
 
 /**
+ * @summary List all ISA-95 work centres with utilisation summary
+ */
+export const ListWorkCentresResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "workCenterType": zod.string(),
+  "capacity": zod.number(),
+  "areaName": zod.string(),
+  "areaType": zod.string(),
+  "siteName": zod.string(),
+  "twinState": zod.string(),
+  "activeCount": zod.number(),
+  "utilisationPct": zod.number(),
+  "byStatus": zod.record(zod.string(), zod.number())
+})
+export const ListWorkCentresResponse = zod.array(ListWorkCentresResponseItem)
+
+
+/**
+ * @summary Detailed utilisation for one work centre
+ */
+export const GetWorkCentreUtilisationParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetWorkCentreUtilisationResponse = zod.object({
+  "workCentreId": zod.string(),
+  "name": zod.string(),
+  "capacity": zod.number(),
+  "activeCount": zod.number(),
+  "utilisationPct": zod.number(),
+  "byStatus": zod.record(zod.string(), zod.number()),
+  "segments": zod.array(zod.object({
+  "id": zod.string(),
+  "engineId": zod.string(),
+  "sourceTcn": zod.string().nullish(),
+  "sequenceNumber": zod.number(),
+  "segmentStatus": zod.string(),
+  "scheduledStart": zod.string().nullish(),
+  "actualStart": zod.string().nullish(),
+  "updatedAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Create an ISA-95 operations request (work order twin)
+ */
+export const CreateOperationsRequestBody = zod.object({
+  "engineId": zod.string(),
+  "requestType": zod.string().optional(),
+  "priority": zod.number().optional(),
+  "workCentreId": zod.string().optional(),
+  "sourceTcns": zod.array(zod.string()).optional()
+})
+
+export const CreateOperationsRequestResponse = zod.object({
+  "id": zod.string(),
+  "engineId": zod.string(),
+  "requestType": zod.string(),
+  "priority": zod.number(),
+  "sourceWorkPackageId": zod.string().nullish(),
+  "sourceRecommendationId": zod.string().nullish(),
+  "requestedStartTime": zod.string().nullish(),
+  "requestedEndTime": zod.string().nullish(),
+  "status": zod.string(),
+  "twinState": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary List operation segments for an operations request
+ */
+export const GetOperationSegmentsParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetOperationSegmentsResponseItem = zod.object({
+  "id": zod.string(),
+  "operationsRequestId": zod.string(),
+  "sequenceNumber": zod.number(),
+  "sourceTcn": zod.string().nullish(),
+  "sourceTaskId": zod.string().nullish(),
+  "assignedWorkCenterId": zod.string().nullish(),
+  "assignedWorkUnitId": zod.string().nullish(),
+  "scheduledStart": zod.string().nullish(),
+  "scheduledEnd": zod.string().nullish(),
+  "actualStart": zod.string().nullish(),
+  "actualEnd": zod.string().nullish(),
+  "segmentStatus": zod.string(),
+  "twinState": zod.string(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+export const GetOperationSegmentsResponse = zod.array(GetOperationSegmentsResponseItem)
+
+
+/**
  * @summary Run the decision pipeline over current engine data
  */
 export const RunPipelineResponse = zod.object({

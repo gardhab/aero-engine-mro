@@ -9,3 +9,6 @@ export * from "./backtest-runs";
 export * from "./activity";
 export * from "./llps";
 export * from "./work-package-tasks";
+export * from "./work-centres";
+export * from "./operations-execution";
+export * from "./personnel";

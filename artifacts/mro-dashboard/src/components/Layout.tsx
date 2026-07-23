@@ -108,6 +108,11 @@ export function Layout({ children }: LayoutProps) {
                     Production Control
                   </SideNavLink>
                 </Link>
+                <Link href="/work-centres" asChild>
+                  <SideNavLink renderIcon={DataStructured} href="/work-centres" isActive={location.startsWith('/work-centres')}>
+                    Work Centres
+                  </SideNavLink>
+                </Link>
                 <Link href="/exchanges" asChild>
                   <SideNavLink renderIcon={Types} href="/exchanges" isActive={location.startsWith('/exchanges')}>
                     Shop Visits

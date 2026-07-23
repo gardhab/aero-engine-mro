@@ -10,6 +10,7 @@ import sapRouter from "./sap";
 import backtestRouter from "./backtest";
 import exchangeRouter from "./exchange";
 import workPackagesRouter from "./work-packages";
+import workCentresRouter from "./work-centres";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(sapRouter);
 router.use(backtestRouter);
 router.use(exchangeRouter);
 router.use(workPackagesRouter);
+router.use(workCentresRouter);
 
 export default router;

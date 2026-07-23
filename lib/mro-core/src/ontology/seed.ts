@@ -505,6 +505,76 @@ export const SEED_CLASSES: Omit<
       { name: "completedAt", type: "string", description: "Execution completion (ISO)" },
     ],
   },
+  // --- ISA-95 Extension Classes ---
+  {
+    id: "WorkCenter",
+    label: "Work Centre",
+    description:
+      "ISA-95 Level 3 work centre: a named grouping of work units in an MRO shop with a defined capacity and type (borescope, blade repair, NDT, test cell, etc.).",
+    parentClass: null,
+    deprecated: false,
+    attributes: [
+      { name: "workCenterType", type: "string", description: "Functional type (BORESCOPE, BLADE_REPAIR, NDT, TEST_CELL, BALANCING, COMBUSTION, …)" },
+      { name: "capacity", type: "number", description: "Maximum concurrent operation segments this centre can hold" },
+      { name: "areaType", type: "string", description: "MRO area classification (ENGINE_DISASSEMBLY, MODULE_REPAIR, TEST_CELL, PARTS_STORE)" },
+    ],
+  },
+  {
+    id: "PersonnelClass",
+    label: "Personnel Class",
+    description:
+      "ISA-95 personnel class capturing the skill role and regulatory qualifications required by a process segment (e.g. EASA Part-66 B1, OEM borescope approval, NDT Level II).",
+    parentClass: null,
+    deprecated: false,
+    attributes: [
+      { name: "classCode", type: "string", description: "Skill code matching MROSkillCode enum (B1_MECHANICAL, BORESCOPE, NDT_LII, BLADE_REPAIR, QUALITY_INSPECTOR)" },
+      { name: "regulatoryAuthority", type: "string", description: "Issuing authority (EASA, EN4179, Rolls-Royce, …)" },
+    ],
+  },
+  {
+    id: "OperationsRequest",
+    label: "Operations Request",
+    description:
+      "ISA-95 Level 3 operations request — the shop-floor twin of a maintenance work package. Links one engine to its ordered set of OperationSegments (TCN tasks).",
+    parentClass: null,
+    deprecated: false,
+    attributes: [
+      { name: "requestType", type: "string", description: "Request type: MAINTENANCE, INSPECTION, MOD" },
+      { name: "priority", type: "number", description: "Execution priority 1 (highest) – 5 (lowest)" },
+      { name: "status", type: "string", description: "CREATED | IN_PROGRESS | COMPLETE | CANCELLED" },
+      { name: "sourceTcn", type: "string", description: "TCN of the source WorkPackage" },
+    ],
+  },
+  {
+    id: "OperationSegment",
+    label: "Operation Segment",
+    description:
+      "ISA-95 operation segment — the execution unit for one step of an OperationsRequest. Mirrors a WorkPackageTask / TCN; carries its scheduling, actuals, HOLD reason, and findings.",
+    parentClass: null,
+    deprecated: false,
+    attributes: [
+      { name: "sequenceNumber", type: "number", description: "Execution order within the request" },
+      { name: "segmentStatus", type: "string", description: "PENDING | READY | IN_PROGRESS | HOLD_SKILL | HOLD_MATERIAL | HOLD_EQUIPMENT | COMPLETE | SKIPPED" },
+      { name: "scheduledStart", type: "string", description: "Planned start (ISO)" },
+      { name: "actualStart", type: "string", description: "Actual start (ISO)" },
+      { name: "sourceTcn", type: "string", description: "TCN that this segment mirrors (e.g. TCN-1042)" },
+    ],
+  },
+  {
+    id: "Material",
+    label: "Material",
+    description:
+      "ISA-95 material — a part, consumable, or raw material required by an operation segment. Tracks lot/serial number and current quantity available.",
+    parentClass: null,
+    deprecated: false,
+    attributes: [
+      { name: "partNumber", type: "string", description: "OEM part number" },
+      { name: "serialNumber", type: "string", description: "Serial number (life-limited parts)" },
+      { name: "materialStatus", type: "string", description: "IN_STOCK | ON_ORDER | QUARANTINED | CONSUMED | SCRAPPED" },
+      { name: "quantityOnHand", type: "number", description: "Current serviceable quantity" },
+      { name: "uom", type: "string", description: "Unit of measure (ea, kg, l, …)" },
+    ],
+  },
   {
     id: "ComplianceAssessment",
     label: "Compliance Assessment",

@@ -932,6 +932,101 @@ export interface ProductionControl {
   bottlenecks: BottleneckAlert[];
 }
 
+export type WorkCentreWithContextByStatus = {[key: string]: number};
+
+export interface WorkCentreWithContext {
+  id: string;
+  name: string;
+  workCenterType: string;
+  capacity: number;
+  areaName: string;
+  areaType: string;
+  siteName: string;
+  twinState: string;
+  activeCount: number;
+  utilisationPct: number;
+  byStatus: WorkCentreWithContextByStatus;
+}
+
+export interface SegmentSummary {
+  id: string;
+  engineId: string;
+  /** @nullable */
+  sourceTcn?: string | null;
+  sequenceNumber: number;
+  segmentStatus: string;
+  /** @nullable */
+  scheduledStart?: string | null;
+  /** @nullable */
+  actualStart?: string | null;
+  updatedAt: string;
+}
+
+export type WorkCentreUtilisationByStatus = {[key: string]: number};
+
+export interface WorkCentreUtilisation {
+  workCentreId: string;
+  name: string;
+  capacity: number;
+  activeCount: number;
+  utilisationPct: number;
+  byStatus: WorkCentreUtilisationByStatus;
+  segments: SegmentSummary[];
+}
+
+export interface CreateOperationsRequestInput {
+  engineId: string;
+  requestType?: string;
+  priority?: number;
+  workCentreId?: string;
+  sourceTcns?: string[];
+}
+
+export interface OperationsRequestRecord {
+  id: string;
+  engineId: string;
+  requestType: string;
+  priority: number;
+  /** @nullable */
+  sourceWorkPackageId?: string | null;
+  /** @nullable */
+  sourceRecommendationId?: string | null;
+  /** @nullable */
+  requestedStartTime?: string | null;
+  /** @nullable */
+  requestedEndTime?: string | null;
+  status: string;
+  twinState: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OperationSegmentRecord {
+  id: string;
+  operationsRequestId: string;
+  sequenceNumber: number;
+  /** @nullable */
+  sourceTcn?: string | null;
+  /** @nullable */
+  sourceTaskId?: string | null;
+  /** @nullable */
+  assignedWorkCenterId?: string | null;
+  /** @nullable */
+  assignedWorkUnitId?: string | null;
+  /** @nullable */
+  scheduledStart?: string | null;
+  /** @nullable */
+  scheduledEnd?: string | null;
+  /** @nullable */
+  actualStart?: string | null;
+  /** @nullable */
+  actualEnd?: string | null;
+  segmentStatus: string;
+  twinState: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ActivityEventType = typeof ActivityEventType[keyof typeof ActivityEventType];
 
 

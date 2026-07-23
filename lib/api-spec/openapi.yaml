@@ -14,6 +14,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: operations
+    description: ISA-95 equipment hierarchy and work centre management
+  - name: execution
+    description: ISA-95 operations requests and execution segments
   - name: dashboard
     description: Fleet overview and activity
   - name: engines
@@ -497,6 +501,80 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProductionControl"
+
+  /work-centres:
+    get:
+      operationId: listWorkCentres
+      tags: [operations]
+      summary: List all ISA-95 work centres with utilisation summary
+      responses:
+        "200":
+          description: Work centres with current segment counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkCentreWithContext"
+
+  /work-centres/{id}/utilisation:
+    get:
+      operationId: getWorkCentreUtilisation
+      tags: [operations]
+      summary: Detailed utilisation for one work centre
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Work centre utilisation detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkCentreUtilisation"
+        "404":
+          description: Work centre not found
+
+  /operations-requests:
+    post:
+      operationId: createOperationsRequest
+      tags: [execution]
+      summary: Create an ISA-95 operations request (work order twin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOperationsRequestInput"
+      responses:
+        "201":
+          description: Created operations request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationsRequestRecord"
+
+  /operations-requests/{id}/segments:
+    get:
+      operationId: getOperationSegments
+      tags: [execution]
+      summary: List operation segments for an operations request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of operation segments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OperationSegmentRecord"
 
   /pipeline/run:
     post:
@@ -1978,6 +2056,103 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BottleneckAlert"
+
+    WorkCentreWithContext:
+      type: object
+      required: [id, name, workCenterType, capacity, areaName, areaType, siteName, twinState, activeCount, utilisationPct, byStatus]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        workCenterType: { type: string }
+        capacity: { type: integer }
+        areaName: { type: string }
+        areaType: { type: string }
+        siteName: { type: string }
+        twinState: { type: string }
+        activeCount: { type: integer }
+        utilisationPct: { type: integer }
+        byStatus:
+          type: object
+          additionalProperties: { type: integer }
+
+    SegmentSummary:
+      type: object
+      required: [id, engineId, sequenceNumber, segmentStatus, updatedAt]
+      properties:
+        id: { type: string }
+        engineId: { type: string }
+        sourceTcn: { type: ["string", "null"] }
+        sequenceNumber: { type: integer }
+        segmentStatus: { type: string }
+        scheduledStart: { type: ["string", "null"] }
+        actualStart: { type: ["string", "null"] }
+        updatedAt: { type: string }
+
+    WorkCentreUtilisation:
+      type: object
+      required: [workCentreId, name, capacity, activeCount, utilisationPct, byStatus, segments]
+      properties:
+        workCentreId: { type: string }
+        name: { type: string }
+        capacity: { type: integer }
+        activeCount: { type: integer }
+        utilisationPct: { type: integer }
+        byStatus:
+          type: object
+          additionalProperties: { type: integer }
+        segments:
+          type: array
+          items:
+            $ref: "#/components/schemas/SegmentSummary"
+
+    CreateOperationsRequestInput:
+      type: object
+      required: [engineId]
+      properties:
+        engineId: { type: string }
+        requestType: { type: string }
+        priority: { type: integer }
+        workCentreId: { type: string }
+        sourceTcns:
+          type: array
+          items: { type: string }
+
+    OperationsRequestRecord:
+      type: object
+      required: [id, engineId, requestType, priority, status, twinState, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        engineId: { type: string }
+        requestType: { type: string }
+        priority: { type: integer }
+        sourceWorkPackageId: { type: ["string", "null"] }
+        sourceRecommendationId: { type: ["string", "null"] }
+        requestedStartTime: { type: ["string", "null"] }
+        requestedEndTime: { type: ["string", "null"] }
+        status: { type: string }
+        twinState: { type: string }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+
+    OperationSegmentRecord:
+      type: object
+      required: [id, operationsRequestId, sequenceNumber, segmentStatus, twinState, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        operationsRequestId: { type: string }
+        sequenceNumber: { type: integer }
+        sourceTcn: { type: ["string", "null"] }
+        sourceTaskId: { type: ["string", "null"] }
+        assignedWorkCenterId: { type: ["string", "null"] }
+        assignedWorkUnitId: { type: ["string", "null"] }
+        scheduledStart: { type: ["string", "null"] }
+        scheduledEnd: { type: ["string", "null"] }
+        actualStart: { type: ["string", "null"] }
+        actualEnd: { type: ["string", "null"] }
+        segmentStatus: { type: string }
+        twinState: { type: string }
+        createdAt: { type: string }
+        updatedAt: { type: string }
 
     ActivityEvent:
       type: object

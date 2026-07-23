@@ -20,6 +20,10 @@ import {
 } from "@workspace/mro-core";
 import { logActivity } from "./activity";
 import { logger } from "../logger";
+import {
+  ensureOperationsRequestForWorkPackage,
+  syncSegmentStatus,
+} from "./equipment-hierarchy";
 
 function toWorkPackageTaskBase(row: WorkPackageTaskRow) {
   return {
@@ -141,10 +145,32 @@ export async function ensureWorkPackageForRecommendation(
     `Work package created for ${rec.engineId} (${rec.failureMode}): ${tcns.join(", ")}.`,
     { engineId: rec.engineId, recommendationId: rec.id },
   );
-  logger.info(
-    { recommendationId: rec.id, tcns },
-    "Created TCN work package",
+  logger.info({ recommendationId: rec.id, tcns }, "Created TCN work package");
+
+  // Bridge to ISA-95 execution model: create matching OperationsRequest +
+  // OperationSegments so the same work is visible in the ISA-95 layer.
+  // Done asynchronously so it never blocks the TCN path.
+  const freshTasks = await db
+    .select()
+    .from(workPackageTasksTable)
+    .where(eq(workPackageTasksTable.workPackageId, workPackageId));
+  await ensureOperationsRequestForWorkPackage(
+    workPackageId,
+    rec.id,
+    rec.engineId,
+    freshTasks.map((t) => ({
+      id: t.id,
+      tcn: formatTcn(t.tcnSeq),
+      sequence: t.sequence,
+      status: t.status,
+      startedAt: t.startedAt,
+      completedAt: t.completedAt,
+      createdAt: t.createdAt,
+    })),
+  ).catch((e) =>
+    logger.warn({ err: e }, "Failed to sync operations request for work package"),
   );
+
   return true;
 }
 
@@ -332,6 +358,21 @@ export async function updateWorkPackageTaskStatus(
     `${tcn} on ${row.engineId} set to ${status.replace(/_/g, " ")}${updatedBy ? ` by ${updatedBy}` : ""}.`,
     { engineId: row.engineId, recommendationId: row.recommendationId },
   );
+
+  // Keep ISA-95 OperationSegment in sync with TCN status.
+  const updatedRow = await db
+    .select()
+    .from(workPackageTasksTable)
+    .where(eq(workPackageTasksTable.id, taskId))
+    .then((r) => r[0]);
+  if (updatedRow) {
+    syncSegmentStatus(
+      taskId,
+      status,
+      updatedRow.startedAt,
+      updatedRow.completedAt,
+    ).catch((e) => logger.warn({ err: e }, "Failed to sync segment status"));
+  }
 
   const packageRows = await db
     .select()
