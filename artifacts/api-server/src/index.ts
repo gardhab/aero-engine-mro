@@ -18,21 +18,25 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 async function main(): Promise<void> {
-  try {
-    await getGraphStore();
-    await ensureSeeded();
-  } catch (err) {
-    // Keep the server up (health checks, diagnostics) even if seeding fails.
-    logger.error({ err }, "Datastore initialization failed");
-  }
-
+  // Listen immediately so the workflow runner detects the port.
+  // Seeding and graph-store init run in the background; requests arriving
+  // before init finishes will hit a cold graph and return gracefully.
   app.listen(port, (err) => {
     if (err) {
       logger.error({ err }, "Error listening on port");
       process.exit(1);
     }
-
     logger.info({ port }, "Server listening");
+
+    // Background init — failures are logged but never crash the server.
+    void (async () => {
+      try {
+        await getGraphStore();
+        await ensureSeeded();
+      } catch (err) {
+        logger.error({ err }, "Datastore initialization failed");
+      }
+    })();
   });
 }
 
