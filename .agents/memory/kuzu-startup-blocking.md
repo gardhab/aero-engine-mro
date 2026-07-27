@@ -23,3 +23,19 @@ The first visit to the Graph Explorer page triggers the lazy build. This takes ~
 - `b4d2e7d` — listen on port immediately, seed in background (stopped workflow kill before port opened)
 - `cd74498` — deferred Kùzu graph rebuild to first /api/graph request
 - `c96466c` — removed Kùzu from startup path entirely
+
+## Also fixed: indirect getGraphStore() callers
+`ontology.ts::graphCounts()` called `getGraphStore()` to count instances per class — this ran Kùzu on every `GET /api/ontology/draft` request and was the hidden cause of the ontology page hanging.
+
+**Rule**: `grep -r "getGraphStore" src/routes/` after any Kùzu refactor to catch indirect callers.
+
+## Pattern: getPeekGraphStore()
+Added `getPeekGraphStore(): GraphStore | null` to `lib/mro/graph.ts`. Use this in any route that can meaningfully handle "no graph yet":
+- Returns existing store if already initialized
+- Returns `null` without touching Kùzu if cold
+- `POST /api/graph/refresh` is the ONLY route allowed to call `getGraphStore()` (the full blocking init)
+
+## Graph UX on cold start
+- `GET /api/graph` returns `{nodes:[], edges:[]}` + `X-Graph-Building: true` header when store is null
+- `GraphExplorer.tsx` shows an `InlineNotification` banner with a "Build graph" button
+- Button posts to `POST /api/graph/refresh`; frontend polls every 5s via `setInterval` until nodes appear
