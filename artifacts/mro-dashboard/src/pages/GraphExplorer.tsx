@@ -1,4 +1,13 @@
 import React, { useMemo, useState } from 'react';
+import {
+  forceSimulation,
+  forceLink,
+  forceManyBody,
+  forceCenter,
+  forceCollide,
+  SimulationNodeDatum,
+  SimulationLinkDatum,
+} from 'd3-force';
 import { useGetGraph, useUpdateGraphNode, getGetGraphQueryKey } from '@workspace/api-client-react';
 import {
   TextInput,
@@ -200,21 +209,44 @@ export default function GraphExplorer() {
     return bfsLimit(graphData.nodes, graphData.edges, engineNodeId, maxHops);
   }, [graphData, debouncedFilter, depth]);
 
-  // Layout: group nodes by type for a readable grid
+  // Layout: force-directed simulation so edges don't cross
   const { initialNodes, initialEdges } = useMemo(() => {
     const { nodes: visibleNodes, edges: visibleEdges } = depthLimitedGraph;
     if (!visibleNodes.length) return { initialNodes: [], initialEdges: [] };
 
-    const types = Array.from(new Set(visibleNodes.map(n => n.type)));
-    const nodes = visibleNodes.map((n) => {
-      const typeIndex = types.indexOf(n.type);
-      const nodesOfThisType = visibleNodes.filter(x => x.type === n.type);
-      const myIndexInType = nodesOfThisType.findIndex(x => x.id === n.id);
+    // Build simulation nodes/links (d3 mutates these in-place)
+    type SimNode = SimulationNodeDatum & { id: string };
+    const simNodes: SimNode[] = visibleNodes.map(n => ({ id: n.id }));
+    const idToIndex = new Map(simNodes.map((n, i) => [n.id, i]));
 
+    type SimLink = SimulationLinkDatum<SimNode>;
+    const simLinks: SimLink[] = visibleEdges
+      .filter(e => idToIndex.has(e.source) && idToIndex.has(e.target))
+      .map(e => ({ source: e.source, target: e.target }));
+
+    // Run simulation to completion synchronously
+    const NODE_W = 220; // approximate node width + gap
+    const NODE_H = 80;  // approximate node height + gap
+
+    const sim = forceSimulation<SimNode>(simNodes)
+      .force('link', forceLink<SimNode, SimLink>(simLinks).id((d: SimNode) => d.id).distance(180).strength(0.5))
+      .force('charge', forceManyBody<SimNode>().strength(-400))
+      .force('center', forceCenter(0, 0))
+      .force('collide', forceCollide<SimNode>(Math.max(NODE_W, NODE_H) / 2 + 10))
+      .stop();
+
+    // Tick until the simulation has converged (alpha threshold ~0.001)
+    const ITERATIONS = Math.ceil(
+      Math.log(sim.alphaMin() / sim.alpha()) / Math.log(1 - sim.alphaDecay())
+    );
+    for (let i = 0; i < ITERATIONS; i++) sim.tick();
+
+    const nodes = visibleNodes.map((n) => {
+      const simNode = simNodes[idToIndex.get(n.id)!];
       const styleDef = NODE_STYLE[n.type];
       return {
         id: n.id,
-        position: { x: typeIndex * 300, y: myIndexInType * 100 },
+        position: { x: simNode.x ?? 0, y: simNode.y ?? 0 },
         data: { label: `${n.label}\n(${n.type})`, fullNode: n },
         style: {
           background: styleDef?.background ?? '#ffffff',

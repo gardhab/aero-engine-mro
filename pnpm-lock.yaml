@@ -528,6 +528,9 @@ importers:
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.101.2(react@19.1.0)
+      '@types/d3-force':
+        specifier: ^3.0.10
+        version: 3.0.10
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.5
