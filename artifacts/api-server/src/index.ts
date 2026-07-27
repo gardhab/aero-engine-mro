@@ -28,15 +28,14 @@ async function main(): Promise<void> {
     }
     logger.info({ port }, "Server listening");
 
-    // Background init — failures are logged but never crash the server.
-    void (async () => {
-      try {
-        await getGraphStore();
-        await ensureSeeded();
-      } catch (err) {
-        logger.error({ err }, "Datastore initialization failed");
-      }
-    })();
+    // Seed the relational DB in the background.
+    // Kùzu (graph store) is intentionally NOT initialized here — its native
+    // addon blocks the event loop for several seconds while opening an
+    // existing database.  The graph store is lazily initialized on the first
+    // GET /api/graph request instead.
+    void ensureSeeded().catch((err) =>
+      logger.error({ err }, "Datastore seeding failed"),
+    );
   });
 }
 
