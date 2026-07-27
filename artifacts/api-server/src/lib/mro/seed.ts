@@ -66,8 +66,8 @@ async function doSeed(): Promise<void> {
     await ensureTatHistorySeeded();
     // ISA-95 equipment hierarchy (work centres, personnel classes).
     await ensureEquipmentHierarchySeeded();
-    // Merge (not replace) so any manual graph-node corrections survive restarts.
-    await rebuildGraphMerge();
+    // Graph rebuild is deferred to the first /api/graph request so Kùzu's
+    // blocking native operations don't stall the event loop at startup.
     return;
   }
 
@@ -166,7 +166,7 @@ async function doSeed(): Promise<void> {
   await ensureWorkPackagesSeeded();
   await ensureTatHistorySeeded();
   await ensureEquipmentHierarchySeeded();
-  await rebuildGraphReplace();
+  // Graph rebuild deferred — see above.
   logger.info("Seeding complete");
 }
 
