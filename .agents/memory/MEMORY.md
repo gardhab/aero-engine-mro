@@ -1,4 +1,5 @@
 - [Kùzu on Nix + pnpm](kuzu-on-nix.md) — native graph module works, but needs onlyBuiltDependencies allowlist + esbuild external + a possibly-manual install.js prebuild.
+- [Kùzu startup blocking](kuzu-startup-blocking.md) — Kùzu native addon blocks the event loop for ~27s on DB open; never call getGraphStore() at startup, only lazily on first GET /api/graph.
 - [Carbon Sass theme config](carbon-theme-config.md) — pass the theme map `themes.$g10`, not the string `'g10'`; `$use-font-face`/`$font-path` are not overridable in the installed version.
 - [Graph projection migrations](graph-projection-migrations.md) — graph merge never deletes: retargeted/relabeled edges need an explicit prune (merge does refresh non-corrected node types/props in place); ontology restructures migrate via rename maps to keep SME edits.
 - [ISA-95 type discriminant](isa95-type-discriminant.md) — PhysicalAsset._type must be `string` (not the literal "PhysicalAsset") or sub-interfaces like ISA95Engine cannot override it with their own literal.
