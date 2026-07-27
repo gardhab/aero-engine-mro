@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   forceSimulation,
   forceLink,
@@ -21,6 +21,7 @@ import {
 import { Save } from '@carbon/icons-react';
 import ReactFlow, { Background, Controls, MiniMap, MarkerType, useNodesState, useEdgesState } from 'reactflow';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSearch, useLocation } from 'wouter';
 
 // Minimal graph types (mirrors mro-core — kept local to avoid a cross-package dep)
 interface GraphNode { id: string; type: string; label: string; properties: Record<string, unknown> }
@@ -166,12 +167,58 @@ function bfsLimit(
 }
 
 export default function GraphExplorer() {
-  const [engineFilter, setEngineFilter] = useState<string>('');
-  const [typeFilterItem, setTypeFilterItem] = useState<TypeFilterItem>(TYPE_FILTER_ITEMS[0]);
-  const [depth, setDepth] = useState<DepthOption>('2-hop');
+  // ── URL search-param persistence ──────────────────────────────────────────
+  const search = useSearch();
+  const [location, navigate] = useLocation();
 
-  // Debounce ESN input
-  const [debouncedFilter, setDebouncedFilter] = useState('');
+  // Parse initial values from URL on first render
+  const searchParams = new URLSearchParams(search);
+  const initialEsn   = searchParams.get('esn') ?? '';
+  const initialType  = searchParams.get('type') ?? 'All types';
+  const initialDepth = (DEPTH_OPTIONS as readonly string[]).includes(searchParams.get('depth') ?? '')
+    ? (searchParams.get('depth') as DepthOption)
+    : '2-hop';
+
+  const initialTypeItem =
+    TYPE_FILTER_ITEMS.find(it => !it.isHeader && it.id === initialType) ??
+    TYPE_FILTER_ITEMS[0];
+
+  const [engineFilter, setEngineFilterRaw] = useState<string>(initialEsn);
+  const [typeFilterItem, setTypeFilterItemRaw] = useState<TypeFilterItem>(initialTypeItem);
+  const [depth, setDepthRaw] = useState<DepthOption>(initialDepth);
+
+  /** Write all three controls to the URL at once */
+  const syncUrl = useCallback(
+    (esn: string, type: string, d: DepthOption) => {
+      const p = new URLSearchParams();
+      if (esn)                  p.set('esn',   esn);
+      if (type !== 'All types') p.set('type',  type);
+      if (d !== '2-hop')        p.set('depth', d);
+      const qs = p.toString();
+      // location is the wouter path (e.g. "/graph"); we replace only the search part
+      const base = location.split('?')[0];
+      navigate(qs ? `${base}?${qs}` : base, { replace: true });
+    },
+    [navigate, location],
+  );
+
+  const setEngineFilter = useCallback((v: string) => {
+    setEngineFilterRaw(v);
+    syncUrl(v, typeFilterItem.isHeader ? 'All types' : typeFilterItem.id, depth);
+  }, [syncUrl, typeFilterItem, depth]);
+
+  const setTypeFilterItem = useCallback((item: TypeFilterItem) => {
+    setTypeFilterItemRaw(item);
+    syncUrl(engineFilter, item.isHeader ? 'All types' : item.id, depth);
+  }, [syncUrl, engineFilter, depth]);
+
+  const setDepth = useCallback((d: DepthOption) => {
+    setDepthRaw(d);
+    syncUrl(engineFilter, typeFilterItem.isHeader ? 'All types' : typeFilterItem.id, d);
+  }, [syncUrl, engineFilter, typeFilterItem]);
+
+  // Debounce ESN input (for API query only — URL is updated immediately)
+  const [debouncedFilter, setDebouncedFilter] = useState(initialEsn);
   React.useEffect(() => {
     const t = setTimeout(() => setDebouncedFilter(engineFilter), 500);
     return () => clearTimeout(t);
