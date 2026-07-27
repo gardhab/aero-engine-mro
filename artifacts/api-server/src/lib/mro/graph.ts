@@ -14,6 +14,15 @@ export async function getGraphStore(): Promise<GraphStore> {
   return store;
 }
 
+/**
+ * Returns the store ONLY if it has already been initialized — never blocks
+ * or initializes Kùzu.  Use this in read-only routes where an empty response
+ * is acceptable on cold start (the client will prompt the user to refresh).
+ */
+export function getPeekGraphStore(): GraphStore | null {
+  return store;
+}
+
 async function initStore(): Promise<GraphStore> {
   const dbPath =
     process.env.KUZU_DB_PATH ?? path.resolve(process.cwd(), ".data", "mro-graph");

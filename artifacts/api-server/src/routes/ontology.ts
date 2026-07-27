@@ -30,7 +30,7 @@ import {
   logActivity,
   nodeCountByClass,
 } from "../lib/mro/service";
-import { getGraphStore } from "../lib/mro/graph";
+import { getPeekGraphStore } from "../lib/mro/graph";
 
 const router: IRouter = Router();
 
@@ -64,7 +64,10 @@ async function loadPublished(): Promise<OntologyVersionRow | undefined> {
 }
 
 async function graphCounts(): Promise<Record<string, number>> {
-  const store = await getGraphStore();
+  // Use peek to avoid initializing Kùzu — if the graph store isn't ready yet,
+  // return empty counts so the ontology page loads instantly.
+  const store = getPeekGraphStore();
+  if (!store) return {};
   const graph = await store.getGraph();
   return nodeCountByClass(graph);
 }

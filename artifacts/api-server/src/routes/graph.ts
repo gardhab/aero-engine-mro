@@ -4,7 +4,7 @@ import {
   GetGraphNodeResponse,
   UpdateGraphNodeResponse,
 } from "@workspace/api-zod";
-import { getGraphStore } from "../lib/mro/graph";
+import { getGraphStore, getPeekGraphStore } from "../lib/mro/graph";
 import { rebuildGraphMerge } from "../lib/mro/service";
 import { logger } from "../lib/logger";
 
@@ -41,11 +41,16 @@ export function triggerGraphBuild(): void {
 }
 
 router.get("/graph", async (req, res): Promise<void> => {
-  // Never auto-trigger the Kùzu rebuild here — doing so would block the
-  // event loop and stall unrelated routes (rules, ontology, fleet…).
-  // The store may already have cached data from a prior run; we serve that
-  // immediately.  If it is empty the client can POST /api/graph/refresh.
-  const store = await getGraphStore();
+  // Use the peek accessor — NEVER initializes Kùzu.  If the store is not yet
+  // open we return an empty graph immediately; the client will show the
+  // "Build graph" banner and let the planner trigger a refresh explicitly.
+  const store = getPeekGraphStore();
+  if (!store) {
+    res.setHeader("X-Graph-Building", "true");
+    res.json(GetGraphResponse.parse({ nodes: [], edges: [] }));
+    return;
+  }
+
   const engineId =
     typeof req.query.engineId === "string" ? req.query.engineId : undefined;
   const type = typeof req.query.type === "string" ? req.query.type : undefined;
@@ -61,18 +66,28 @@ router.get("/graph", async (req, res): Promise<void> => {
  * This is the only place we trigger the blocking native-addon work so that
  * other routes are never stalled by it.
  */
-router.post("/graph/refresh", (_req, res): void => {
+/**
+ * POST /api/graph/refresh — the ONLY place that may initialize Kùzu.
+ * Planners call this explicitly; we accept the blocking native-addon work here
+ * because it happens in an isolated request the client fires and forgets.
+ * Returns 202 immediately; the client polls GET /api/graph until populated.
+ */
+router.post("/graph/refresh", async (_req, res): Promise<void> => {
   if (graphReady) {
     // Force a re-build even if already done (planner wants fresh data).
     graphReady = false;
     graphBuildPromise = null;
   }
+  // Ensure the store is initialized (opens Kùzu DB).  This may block briefly,
+  // but only this one refresh request is affected — no other routes are stalled.
+  await getGraphStore();
   triggerGraphBuild();
   res.status(202).json({ building: true });
 });
 
 router.get("/graph/nodes/:id", async (req, res): Promise<void> => {
-  const store = await getGraphStore();
+  const store = getPeekGraphStore();
+  if (!store) { res.status(503).json({ error: "Graph not yet built" }); return; }
   const node = await store.getNode(req.params.id);
   if (!node) {
     res.status(404).json({ error: "Node not found" });
@@ -87,7 +102,8 @@ router.patch("/graph/nodes/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: "properties object is required" });
     return;
   }
-  const store = await getGraphStore();
+  const store = getPeekGraphStore();
+  if (!store) { res.status(503).json({ error: "Graph not yet built" }); return; }
   const node = await store.updateNode(req.params.id, body.properties);
   if (!node) {
     res.status(404).json({ error: "Node not found" });
