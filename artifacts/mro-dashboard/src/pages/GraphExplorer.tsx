@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   forceSimulation,
   forceLink,
@@ -226,7 +226,7 @@ export default function GraphExplorer() {
 
   const typeFilter = typeFilterItem.isHeader ? 'All types' : typeFilterItem.id;
 
-  const { data: graphData, isLoading } = useGetGraph(
+  const { data: graphData, isLoading, refetch: refetchGraph } = useGetGraph(
     debouncedFilter || typeFilter !== 'All types'
       ? {
           ...(debouncedFilter ? { engineId: debouncedFilter } : {}),
@@ -234,6 +234,15 @@ export default function GraphExplorer() {
         }
       : undefined
   );
+
+  // While the server is still building the graph (nodes === 0 and not loading),
+  // poll every 5 s so the canvas populates automatically without a page refresh.
+  const isGraphBuilding = !isLoading && (graphData?.nodes.length ?? 0) === 0;
+  useEffect(() => {
+    if (!isGraphBuilding) return;
+    const id = setInterval(() => { void refetchGraph(); }, 5000);
+    return () => clearInterval(id);
+  }, [isGraphBuilding, refetchGraph]);
 
   const updateNode = useUpdateGraphNode();
   const queryClient = useQueryClient();
@@ -417,6 +426,32 @@ export default function GraphExplorer() {
           </div>
         </div>
       </div>
+
+      {/* Empty-graph banner: graph not yet built or being rebuilt */}
+      {isGraphBuilding && !isLoading && (
+        <div className="shrink-0 mb-2">
+          <InlineNotification
+            kind="info"
+            title="Graph not yet built"
+            subtitle="Click 'Build graph' to generate the knowledge graph from current fleet data. Other pages work normally while the graph builds (~10 s)."
+            lowContrast
+            hideCloseButton
+            actions={
+              <Button
+                kind="ghost"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await fetch('/api/graph/refresh', { method: 'POST' });
+                  } catch { /* ignore */ }
+                }}
+              >
+                Build graph
+              </Button>
+            }
+          />
+        </div>
+      )}
 
       {/* Max-nodes warning */}
       {showMaxNodesWarning && (

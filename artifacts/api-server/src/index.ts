@@ -1,7 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { ensureSeeded } from "./lib/mro/seed";
-import { getGraphStore } from "./lib/mro/graph";
 
 const rawPort = process.env["PORT"];
 
@@ -28,11 +27,11 @@ async function main(): Promise<void> {
     }
     logger.info({ port }, "Server listening");
 
-    // Seed the relational DB in the background.
-    // Kùzu (graph store) is intentionally NOT initialized here — its native
-    // addon blocks the event loop for several seconds while opening an
-    // existing database.  The graph store is lazily initialized on the first
-    // GET /api/graph request instead.
+    // Seed the relational DB in the background (PostgreSQL — non-blocking).
+    // The Kùzu graph store is NOT initialized here. Its native addon blocks
+    // the event loop while merging nodes and stalls all other routes.
+    // Graph data is served from cached Kùzu state; planners trigger a refresh
+    // explicitly via POST /api/graph/refresh when they want fresh data.
     void ensureSeeded().catch((err) =>
       logger.error({ err }, "Datastore seeding failed"),
     );
