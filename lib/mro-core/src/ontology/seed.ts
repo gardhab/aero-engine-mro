@@ -599,6 +599,57 @@ export const SEED_CLASSES: Omit<
       { name: "assessedAt", type: "string", description: "Assessment time (ISO)" },
     ],
   },
+  // ---- ISA-95 Part 2: Equipment Hierarchy --------------------------------
+  {
+    id: "WorkUnit",
+    label: "Work Unit",
+    description:
+      "ISA-95 Level 3 work unit: the finest-grained schedulable resource within a work centre — a specific bay, cell, or stand on which one operation segment executes at a time.",
+    parentClass: null,
+    deprecated: false,
+    attributes: [
+      {
+        name: "workUnitType",
+        type: "string",
+        description: "Category of work unit",
+        enumValues: ["WorkCell", "ProductionUnit", "StorageUnit"],
+      },
+      { name: "workCenterId", type: "string", description: "Parent work centre ID" },
+    ],
+  },
+  {
+    id: "EquipmentClass",
+    label: "Equipment Class",
+    description:
+      "ISA-95 equipment class: a category of MRO equipment or tooling with shared capabilities (e.g. BORESCOPE_RIG, NDT_RIG, BALANCING_RIG). Task definitions reference a class rather than a specific unit, enabling automatic resource identification.",
+    parentClass: null,
+    deprecated: false,
+    attributes: [
+      { name: "equipmentClassCode", type: "string", description: "Short identifier (e.g. BORESCOPE_RIG)" },
+      {
+        name: "requiredForSkills",
+        type: "string",
+        description: "Skill codes whose task definitions require this equipment class",
+      },
+    ],
+  },
+  {
+    id: "Equipment",
+    label: "Equipment",
+    description:
+      "ISA-95 equipment: a specific serialized piece of MRO tooling or shop equipment assigned to a work unit. Its status determines whether the work unit is operationally ready.",
+    parentClass: null,
+    deprecated: false,
+    attributes: [
+      { name: "serialNumber", type: "string", description: "Equipment serial number" },
+      {
+        name: "equipmentStatus",
+        type: "string",
+        description: "Operational readiness status",
+        enumValues: ["AVAILABLE", "IN_USE", "MAINTENANCE", "CALIBRATION_DUE", "OUT_OF_SERVICE"],
+      },
+    ],
+  },
 ];
 
 export const SEED_RELATIONSHIPS: OntologyRelationship[] = [
@@ -949,6 +1000,57 @@ export const SEED_RELATIONSHIPS: OntologyRelationship[] = [
     targetMultiplicity: "0..*",
     description:
       "The TCN task executions providing evidence for the assessment.",
+    deprecated: false,
+  },
+  // ---- ISA-95 Part 2: Equipment Hierarchy relationships ------------------
+  {
+    id: "hasWorkUnit",
+    label: "has work unit",
+    domain: "WorkCenter",
+    range: "WorkUnit",
+    sourceMultiplicity: "1",
+    targetMultiplicity: "0..*",
+    description: "A work centre is subdivided into individual schedulable work units (bays, cells, stands).",
+    deprecated: false,
+  },
+  {
+    id: "equipmentInUnit",
+    label: "equipment in unit",
+    domain: "WorkUnit",
+    range: "Equipment",
+    sourceMultiplicity: "0..1",
+    targetMultiplicity: "0..*",
+    description: "A work unit holds the specific equipment items assigned to it.",
+    deprecated: false,
+  },
+  {
+    id: "equipInstanceOf",
+    label: "instance of (equipment)",
+    domain: "Equipment",
+    range: "EquipmentClass",
+    sourceMultiplicity: "0..*",
+    targetMultiplicity: "1",
+    description: "A piece of equipment is a member of its equipment class.",
+    deprecated: false,
+  },
+  {
+    id: "requiresEquipment",
+    label: "requires equipment",
+    domain: "MaintenanceTaskDefinition",
+    range: "EquipmentClass",
+    sourceMultiplicity: "0..*",
+    targetMultiplicity: "0..*",
+    description: "A maintenance task definition declares which equipment class it requires, enabling automatic resource identification at work-order creation (FR-09).",
+    deprecated: false,
+  },
+  {
+    id: "segmentUsesEquipment",
+    label: "uses equipment",
+    domain: "OperationSegment",
+    range: "Equipment",
+    sourceMultiplicity: "0..*",
+    targetMultiplicity: "0..*",
+    description: "An executing operation segment uses a specific piece of equipment; its status determines execution readiness (FR-20/FR-26).",
     deprecated: false,
   },
 ];

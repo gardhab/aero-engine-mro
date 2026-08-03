@@ -4,6 +4,7 @@ import {
   integer,
   timestamp,
   uuid,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 // ISA-95 Equipment Hierarchy tables.
@@ -67,8 +68,37 @@ export const workUnitsTable = pgTable("work_units", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const equipmentClassesTable = pgTable("equipment_classes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  equipmentClassCode: text("equipment_class_code").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  /** JSON array of skill-code strings that require this equipment class */
+  requiredForSkills: jsonb("required_for_skills").$type<string[]>().notNull().default([]),
+  twinState: text("twin_state").notNull().default("ACTIVE"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const equipmentTable = pgTable("equipment", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  equipmentClassId: uuid("equipment_class_id")
+    .references(() => equipmentClassesTable.id)
+    .notNull(),
+  workUnitId: uuid("work_unit_id").references(() => workUnitsTable.id),
+  name: text("name").notNull(),
+  serialNumber: text("serial_number"),
+  /** EquipmentStatus: AVAILABLE | IN_USE | MAINTENANCE | CALIBRATION_DUE | OUT_OF_SERVICE */
+  equipmentStatus: text("equipment_status").notNull().default("AVAILABLE"),
+  twinState: text("twin_state").notNull().default("ACTIVE"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export type EnterpriseRow = typeof enterprisesTable.$inferSelect;
 export type SiteRow = typeof sitesTable.$inferSelect;
 export type AreaRow = typeof areasTable.$inferSelect;
 export type WorkCenterRow = typeof workCentersTable.$inferSelect;
 export type WorkUnitRow = typeof workUnitsTable.$inferSelect;
+export type EquipmentClassRow = typeof equipmentClassesTable.$inferSelect;
+export type EquipmentRow = typeof equipmentTable.$inferSelect;

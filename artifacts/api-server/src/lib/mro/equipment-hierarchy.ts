@@ -12,10 +12,14 @@ import {
   areasTable,
   workCentersTable,
   workUnitsTable,
+  equipmentClassesTable,
+  equipmentTable,
   operationsRequestsTable,
   operationSegmentsTable,
   personnelClassesTable,
   type WorkCenterRow,
+  type EquipmentRow,
+  type WorkUnitRow,
 } from "@workspace/db";
 import { logger } from "../logger";
 import { logActivity } from "./activity";
@@ -145,8 +149,398 @@ export async function ensureEquipmentHierarchySeeded(): Promise<void> {
     },
   ]);
 
+  // Fetch inserted work centres by type for FK references
+  const wcs = await db.select().from(workCentersTable);
+  const wcByType = new Map<string, typeof wcs[0][]>();
+  for (const wc of wcs) {
+    const list = wcByType.get(wc.workCenterType) ?? [];
+    list.push(wc);
+    wcByType.set(wc.workCenterType, list);
+  }
+
+  // Equipment Classes — one per major tool/rig category.
+  // requiredForSkills maps ontology skill codes → this class (for FR-09 edge).
+  const [
+    ecBorescope,
+    ecNdt,
+    ecBladeRepair,
+    ecBalancingRig,
+    ecTestCell,
+    ecEngineStand,
+  ] = await db
+    .insert(equipmentClassesTable)
+    .values([
+      {
+        equipmentClassCode: "BORESCOPE_RIG",
+        name: "Borescope Inspection Rig",
+        description: "Flexible/rigid borescope system for on-wing and module inspection.",
+        requiredForSkills: ["Borescope inspection"],
+      },
+      {
+        equipmentClassCode: "NDT_RIG",
+        name: "NDT Inspection Station",
+        description: "Magnetic particle, fluorescent penetrant, and ultrasonic test equipment.",
+        requiredForSkills: ["NDT Level 2"],
+      },
+      {
+        equipmentClassCode: "BLADE_REPAIR_STAND",
+        name: "Blade Repair Stand",
+        description: "Fixture stand for HPT/LPT blade blending, tip restoration and coating.",
+        requiredForSkills: ["Powerplant (hot section)"],
+      },
+      {
+        equipmentClassCode: "BALANCING_RIG",
+        name: "Rotor Balancing Rig",
+        description: "Dynamic balancing machine for fan and turbine rotors.",
+        requiredForSkills: ["Vibration analysis"],
+      },
+      {
+        equipmentClassCode: "TEST_CELL_STAND",
+        name: "Engine Test Cell Stand",
+        description: "Thrust measurement test cell with full ECTM instrumentation.",
+        requiredForSkills: ["Powerplant (rotatives)"],
+      },
+      {
+        equipmentClassCode: "ENGINE_STAND",
+        name: "Engine Build Stand",
+        description: "Rotatable engine stand for module build/disassembly.",
+        requiredForSkills: ["Powerplant", "Powerplant (module exposure)"],
+      },
+    ])
+    .returning();
+
+  // Work Units — 1-2 per work centre, seeded by work centre type.
+  // Returns a flat list; we'll look up by work centre id.
+  const workUnitInserts: { workCenterId: string; name: string; workUnitType: string }[] = [];
+
+  for (const [type, centres] of wcByType) {
+    for (const wc of centres) {
+      switch (type) {
+        case "BORESCOPE":
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Cell 1`, workUnitType: "WorkCell" });
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Cell 2`, workUnitType: "WorkCell" });
+          break;
+        case "NDT":
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Station A`, workUnitType: "WorkCell" });
+          break;
+        case "BLADE_REPAIR":
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Bench 1`, workUnitType: "WorkCell" });
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Bench 2`, workUnitType: "WorkCell" });
+          break;
+        case "BALANCING":
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Balance Rig`, workUnitType: "ProductionUnit" });
+          break;
+        case "TEST_CELL":
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Stand`, workUnitType: "ProductionUnit" });
+          break;
+        case "COMBUSTION":
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Bench A`, workUnitType: "WorkCell" });
+          break;
+        default:
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Bay 1`, workUnitType: "WorkCell" });
+      }
+    }
+  }
+
+  const workUnits = await db.insert(workUnitsTable).values(workUnitInserts).returning();
+  const wuByWcId = new Map<string, typeof workUnits[0][]>();
+  for (const wu of workUnits) {
+    const list = wuByWcId.get(wu.workCenterId) ?? [];
+    list.push(wu);
+    wuByWcId.set(wu.workCenterId, list);
+  }
+
+  // Equipment — 1-2 pieces per work unit with varied statuses for realism.
+  const equipInserts: {
+    equipmentClassId: string;
+    workUnitId: string;
+    name: string;
+    serialNumber: string;
+    equipmentStatus: string;
+  }[] = [];
+
+  let eqSerial = 1001;
+  const nextSerial = () => `SN-${eqSerial++}`;
+
+  for (const [type, centres] of wcByType) {
+    for (const wc of centres) {
+      const units = wuByWcId.get(wc.id) ?? [];
+      for (let ui = 0; ui < units.length; ui++) {
+        const wu = units[ui];
+        // Assign equipment class based on work centre type
+        let classId: string;
+        let baseName: string;
+        switch (type) {
+          case "BORESCOPE":
+            classId = ecBorescope.id;
+            baseName = "Olympus IPLEX NX Borescope";
+            break;
+          case "NDT":
+            classId = ecNdt.id;
+            baseName = "Olympus OMNISCAN FMC Ultrasonic";
+            break;
+          case "BLADE_REPAIR":
+            classId = ecBladeRepair.id;
+            baseName = "Blade Repair Fixture Stand";
+            break;
+          case "BALANCING":
+            classId = ecBalancingRig.id;
+            baseName = "Schenck CAB 930 Balance Rig";
+            break;
+          case "TEST_CELL":
+            classId = ecTestCell.id;
+            baseName = "Test Cell Thrust Stand";
+            break;
+          default:
+            classId = ecEngineStand.id;
+            baseName = "Rolls-Royce Engine Build Stand";
+        }
+
+        // Status varies per work centre type so planners see a realistic mix.
+        // NDT rigs require frequent calibration → CALIBRATION_DUE.
+        // Borescope second unit → IN_USE (active inspection in progress).
+        // All others → AVAILABLE.
+        const status =
+          type === "NDT"
+            ? "CALIBRATION_DUE"
+            : ui === 0
+              ? "AVAILABLE"
+              : type === "BORESCOPE"
+                ? "IN_USE"
+                : "AVAILABLE";
+
+        equipInserts.push({
+          equipmentClassId: classId,
+          workUnitId: wu.id,
+          name: `${baseName} #${ui + 1}`,
+          serialNumber: nextSerial(),
+          equipmentStatus: status,
+        });
+      }
+    }
+  }
+
+  if (equipInserts.length > 0) {
+    await db.insert(equipmentTable).values(equipInserts);
+  }
+
   await logActivity("work_package", HIERARCHY_SEED_MARKER);
   logger.info("ISA-95 equipment hierarchy seeded");
+}
+
+/**
+ * Idempotently seed equipment classes, work units, and equipment on databases
+ * that existed before this feature was added. Safe to call on fresh seeds too —
+ * the equipment_classes check prevents double-inserts.
+ */
+export async function ensureWorkUnitsAndEquipmentSeeded(): Promise<void> {
+  const [{ n }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(equipmentClassesTable);
+  if (n > 0) return; // already seeded
+
+  logger.info("Seeding equipment classes, work units, and equipment");
+
+  // Equipment Classes
+  const [
+    ecBorescope,
+    ecNdt,
+    ecBladeRepair,
+    ecBalancingRig,
+    ecTestCell,
+    ecEngineStand,
+  ] = await db
+    .insert(equipmentClassesTable)
+    .values([
+      {
+        equipmentClassCode: "BORESCOPE_RIG",
+        name: "Borescope Inspection Rig",
+        description: "Flexible/rigid borescope system for on-wing and module inspection.",
+        requiredForSkills: ["Borescope inspection"],
+      },
+      {
+        equipmentClassCode: "NDT_RIG",
+        name: "NDT Inspection Station",
+        description: "Magnetic particle, fluorescent penetrant, and ultrasonic test equipment.",
+        requiredForSkills: ["NDT Level 2"],
+      },
+      {
+        equipmentClassCode: "BLADE_REPAIR_STAND",
+        name: "Blade Repair Stand",
+        description: "Fixture stand for HPT/LPT blade blending, tip restoration and coating.",
+        requiredForSkills: ["Powerplant (hot section)"],
+      },
+      {
+        equipmentClassCode: "BALANCING_RIG",
+        name: "Rotor Balancing Rig",
+        description: "Dynamic balancing machine for fan and turbine rotors.",
+        requiredForSkills: ["Vibration analysis"],
+      },
+      {
+        equipmentClassCode: "TEST_CELL_STAND",
+        name: "Engine Test Cell Stand",
+        description: "Thrust measurement test cell with full ECTM instrumentation.",
+        requiredForSkills: ["Powerplant (rotatives)"],
+      },
+      {
+        equipmentClassCode: "ENGINE_STAND",
+        name: "Engine Build Stand",
+        description: "Rotatable engine stand for module build/disassembly.",
+        requiredForSkills: ["Powerplant", "Powerplant (module exposure)"],
+      },
+    ])
+    .returning();
+
+  const wcs = await db.select().from(workCentersTable);
+  const wcByType = new Map<string, typeof wcs[0][]>();
+  for (const wc of wcs) {
+    const list = wcByType.get(wc.workCenterType) ?? [];
+    list.push(wc);
+    wcByType.set(wc.workCenterType, list);
+  }
+
+  const workUnitInserts: { workCenterId: string; name: string; workUnitType: string }[] = [];
+  for (const [type, centres] of wcByType) {
+    for (const wc of centres) {
+      switch (type) {
+        case "BORESCOPE":
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Cell 1`, workUnitType: "WorkCell" });
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Cell 2`, workUnitType: "WorkCell" });
+          break;
+        case "NDT":
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Station A`, workUnitType: "WorkCell" });
+          break;
+        case "BLADE_REPAIR":
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Bench 1`, workUnitType: "WorkCell" });
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Bench 2`, workUnitType: "WorkCell" });
+          break;
+        case "BALANCING":
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Balance Rig`, workUnitType: "ProductionUnit" });
+          break;
+        case "TEST_CELL":
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Stand`, workUnitType: "ProductionUnit" });
+          break;
+        case "COMBUSTION":
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Bench A`, workUnitType: "WorkCell" });
+          break;
+        default:
+          workUnitInserts.push({ workCenterId: wc.id, name: `${wc.name} — Bay 1`, workUnitType: "WorkCell" });
+      }
+    }
+  }
+
+  const workUnits = await db.insert(workUnitsTable).values(workUnitInserts).returning();
+  const wuByWcId = new Map<string, typeof workUnits[0][]>();
+  for (const wu of workUnits) {
+    const list = wuByWcId.get(wu.workCenterId) ?? [];
+    list.push(wu);
+    wuByWcId.set(wu.workCenterId, list);
+  }
+
+  const equipInserts: {
+    equipmentClassId: string;
+    workUnitId: string;
+    name: string;
+    serialNumber: string;
+    equipmentStatus: string;
+  }[] = [];
+  let eqSerial = 1001;
+  const nextSerial = () => `SN-${eqSerial++}`;
+
+  for (const [type, centres] of wcByType) {
+    for (const wc of centres) {
+      const units = wuByWcId.get(wc.id) ?? [];
+      for (let ui = 0; ui < units.length; ui++) {
+        const wu = units[ui];
+        let classId: string;
+        let baseName: string;
+        switch (type) {
+          case "BORESCOPE": classId = ecBorescope.id; baseName = "Olympus IPLEX NX Borescope"; break;
+          case "NDT": classId = ecNdt.id; baseName = "Olympus OMNISCAN FMC Ultrasonic"; break;
+          case "BLADE_REPAIR": classId = ecBladeRepair.id; baseName = "Blade Repair Fixture Stand"; break;
+          case "BALANCING": classId = ecBalancingRig.id; baseName = "Schenck CAB 930 Balance Rig"; break;
+          case "TEST_CELL": classId = ecTestCell.id; baseName = "Test Cell Thrust Stand"; break;
+          default: classId = ecEngineStand.id; baseName = "Rolls-Royce Engine Build Stand";
+        }
+        const status =
+          type === "NDT"
+            ? "CALIBRATION_DUE"
+            : ui === 0
+              ? "AVAILABLE"
+              : type === "BORESCOPE"
+                ? "IN_USE"
+                : "AVAILABLE";
+        equipInserts.push({
+          equipmentClassId: classId,
+          workUnitId: wu.id,
+          name: `${baseName} #${ui + 1}`,
+          serialNumber: nextSerial(),
+          equipmentStatus: status,
+        });
+      }
+    }
+  }
+
+  if (equipInserts.length > 0) {
+    await db.insert(equipmentTable).values(equipInserts);
+  }
+  logger.info({ workUnits: workUnits.length, equipment: equipInserts.length }, "Equipment and work units seeded");
+}
+
+export interface WorkUnitWithEquipment {
+  id: string;
+  name: string;
+  workUnitType: string;
+  equipment: {
+    id: string;
+    name: string;
+    serialNumber: string | null;
+    equipmentStatus: string;
+    equipmentClassCode: string;
+    equipmentClassName: string;
+  }[];
+}
+
+/** Return work units with their equipment for a specific work centre. */
+export async function listWorkUnitsForCentre(workCentreId: string): Promise<WorkUnitWithEquipment[]> {
+  const units = await db
+    .select()
+    .from(workUnitsTable)
+    .where(eq(workUnitsTable.workCenterId, workCentreId));
+
+  if (units.length === 0) return [];
+
+  const unitIds = units.map((u) => u.id);
+  const eqRows = await db
+    .select({
+      eq: equipmentTable,
+      ec: equipmentClassesTable,
+    })
+    .from(equipmentTable)
+    .innerJoin(equipmentClassesTable, eq(equipmentTable.equipmentClassId, equipmentClassesTable.id))
+    .where(inArray(equipmentTable.workUnitId, unitIds));
+
+  const eqByUnit = new Map<string, typeof eqRows>();
+  for (const row of eqRows) {
+    if (!row.eq.workUnitId) continue;
+    const list = eqByUnit.get(row.eq.workUnitId) ?? [];
+    list.push(row);
+    eqByUnit.set(row.eq.workUnitId, list);
+  }
+
+  return units.map((u) => ({
+    id: u.id,
+    name: u.name,
+    workUnitType: u.workUnitType,
+    equipment: (eqByUnit.get(u.id) ?? []).map(({ eq: e, ec }) => ({
+      id: e.id,
+      name: e.name,
+      serialNumber: e.serialNumber,
+      equipmentStatus: e.equipmentStatus,
+      equipmentClassCode: ec.equipmentClassCode,
+      equipmentClassName: ec.name,
+    })),
+  }));
 }
 
 /** Return all work centres with their area context. */

@@ -15,6 +15,9 @@ import {
   operationSegmentsTable,
   operationsRequestsTable,
   personnelClassesTable,
+  workUnitsTable,
+  equipmentClassesTable,
+  equipmentTable,
 } from "@workspace/db";
 import {
   LLP_CRITICAL_REMAINING,
@@ -36,9 +39,12 @@ import {
   supersededSensorEdgeIds,
   toLifeLimitedParts,
   type ActivityType,
+  type GraphEquipment,
+  type GraphEquipmentClass,
   type GraphOperationSegment,
   type GraphPersonnelClass,
   type GraphWorkCentre,
+  type GraphWorkUnit,
   type OntologyClass,
   type PipelineResult,
   type Rule,
@@ -307,6 +313,9 @@ async function loadGraphInputs() {
     operationSegmentRows,
     personnelClassRows,
     operationsRequestRows,
+    workUnitRows,
+    equipmentClassRows,
+    equipmentRows,
   ] = await Promise.all([
     db.select().from(enginesTable),
     db.select().from(rulesTable),
@@ -338,6 +347,9 @@ async function loadGraphInputs() {
     db.select().from(operationSegmentsTable),
     db.select().from(personnelClassesTable),
     db.select().from(operationsRequestsTable),
+    db.select().from(workUnitsTable),
+    db.select().from(equipmentClassesTable),
+    db.select().from(equipmentTable),
   ]);
 
   // Build engineId lookup for operation segments (stored on request, not segment)
@@ -356,6 +368,7 @@ async function loadGraphInputs() {
       sequenceNumber: s.sequenceNumber,
       segmentStatus: s.segmentStatus,
       assignedWorkCenterId: s.assignedWorkCenterId,
+      assignedWorkUnitId: s.assignedWorkUnitId,
       twinState: s.twinState,
     }),
   );
@@ -367,6 +380,29 @@ async function loadGraphInputs() {
       name: p.name,
     }),
   );
+
+  const workUnits: GraphWorkUnit[] = workUnitRows.map((wu) => ({
+    id: wu.id,
+    workCenterId: wu.workCenterId,
+    name: wu.name,
+    workUnitType: wu.workUnitType,
+  }));
+
+  const equipmentClasses: GraphEquipmentClass[] = equipmentClassRows.map((ec) => ({
+    id: ec.id,
+    equipmentClassCode: ec.equipmentClassCode,
+    name: ec.name,
+    requiredForSkills: (ec.requiredForSkills as string[]) ?? [],
+  }));
+
+  const equipment: GraphEquipment[] = equipmentRows.map((eq) => ({
+    id: eq.id,
+    equipmentClassId: eq.equipmentClassId,
+    workUnitId: eq.workUnitId,
+    name: eq.name,
+    serialNumber: eq.serialNumber,
+    equipmentStatus: eq.equipmentStatus,
+  }));
 
   return [
     engineRows.map((e) => toEngine(e, 0)),
@@ -380,6 +416,9 @@ async function loadGraphInputs() {
     workCentres,
     operationSegments,
     personnelClasses,
+    workUnits,
+    equipmentClasses,
+    equipment,
   ] as const;
 }
 

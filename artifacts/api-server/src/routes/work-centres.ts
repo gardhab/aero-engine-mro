@@ -4,6 +4,7 @@ import { db, operationsRequestsTable, operationSegmentsTable } from "@workspace/
 import {
   listWorkCentres,
   getWorkCentreUtilisation,
+  listWorkUnitsForCentre,
 } from "../lib/mro/equipment-hierarchy";
 
 const router = Router();
@@ -12,6 +13,12 @@ const router = Router();
 router.get("/work-centres", async (_req, res): Promise<void> => {
   const wcs = await listWorkCentres();
   res.json(wcs);
+});
+
+/** GET /work-centres/:id/work-units — work units + equipment for one work centre */
+router.get("/work-centres/:id/work-units", async (req, res): Promise<void> => {
+  const result = await listWorkUnitsForCentre(req.params.id);
+  res.json(result);
 });
 
 /** GET /work-centres/:id/utilisation — detailed utilisation for one work centre */

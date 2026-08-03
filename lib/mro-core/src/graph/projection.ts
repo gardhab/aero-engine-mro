@@ -43,6 +43,7 @@ export interface GraphOperationSegment {
   sequenceNumber: number;
   segmentStatus: string;
   assignedWorkCenterId: string | null;
+  assignedWorkUnitId: string | null;
   twinState: string;
 }
 
@@ -51,6 +52,33 @@ export interface GraphPersonnelClass {
   id: string;
   classCode: string;
   name: string;
+}
+
+/** Minimal ISA-95 Work Unit shape needed for graph projection. */
+export interface GraphWorkUnit {
+  id: string;
+  workCenterId: string;
+  name: string;
+  workUnitType: string;
+}
+
+/** Minimal ISA-95 Equipment Class shape needed for graph projection. */
+export interface GraphEquipmentClass {
+  id: string;
+  equipmentClassCode: string;
+  name: string;
+  /** Skill codes that require this equipment class, e.g. ["Borescope inspection"] */
+  requiredForSkills: string[];
+}
+
+/** Minimal ISA-95 Equipment shape needed for graph projection. */
+export interface GraphEquipment {
+  id: string;
+  equipmentClassId: string;
+  workUnitId: string | null;
+  name: string;
+  serialNumber: string | null;
+  equipmentStatus: string;
 }
 
 export function buildGraph(
@@ -70,6 +98,12 @@ export function buildGraph(
   operationSegments: GraphOperationSegment[] = [],
   /** ISA-95 Personnel Classes (skill/qualification types). */
   personnelClasses: GraphPersonnelClass[] = [],
+  /** ISA-95 Work Units (bay/cell/stand level under a work centre). */
+  workUnits: GraphWorkUnit[] = [],
+  /** ISA-95 Equipment Classes (tooling categories). */
+  equipmentClasses: GraphEquipmentClass[] = [],
+  /** ISA-95 Equipment (specific tooling instances assigned to work units). */
+  equipment: GraphEquipment[] = [],
 ): GraphData {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
@@ -707,6 +741,144 @@ export function buildGraph(
     });
   }
 
+  // ── ISA-95 Equipment Classes ───────────────────────────────────────────
+  for (const ec of equipmentClasses) {
+    const ecId = `eqclass:${ec.id}`;
+    addNode({
+      id: ecId,
+      type: "EquipmentClass",
+      label: ec.name,
+      properties: {
+        equipmentClassId: ec.id,
+        equipmentClassCode: ec.equipmentClassCode,
+        name: ec.name,
+        requiredForSkills: ec.requiredForSkills.join(", "),
+      },
+    });
+  }
+
+  // ── ISA-95 Work Units ──────────────────────────────────────────────────
+  for (const wu of workUnits) {
+    const wuId = `wu:${wu.id}`;
+    addNode({
+      id: wuId,
+      type: "WorkUnit",
+      label: wu.name,
+      properties: {
+        workUnitId: wu.id,
+        workCenterId: wu.workCenterId,
+        name: wu.name,
+        workUnitType: wu.workUnitType,
+      },
+    });
+    // WorkCenter → hasWorkUnit → WorkUnit
+    const wcId = `wc:${wu.workCenterId}`;
+    if (nodeIds.has(wcId)) {
+      addEdge({
+        id: `e:wu:${wu.id}:hasWorkUnit`,
+        source: wcId,
+        target: wuId,
+        label: "hasWorkUnit",
+      });
+    }
+  }
+
+  // ── ISA-95 Equipment ───────────────────────────────────────────────────
+  for (const eq of equipment) {
+    const eqId = `eq:${eq.id}`;
+    addNode({
+      id: eqId,
+      type: "Equipment",
+      label: eq.name,
+      properties: {
+        equipmentId: eq.id,
+        equipmentClassId: eq.equipmentClassId,
+        workUnitId: eq.workUnitId,
+        name: eq.name,
+        serialNumber: eq.serialNumber,
+        equipmentStatus: eq.equipmentStatus,
+      },
+    });
+    // Equipment → equipInstanceOf → EquipmentClass
+    const ecId = `eqclass:${eq.equipmentClassId}`;
+    if (nodeIds.has(ecId)) {
+      addEdge({
+        id: `e:eq:${eq.id}:equipInstanceOf`,
+        source: eqId,
+        target: ecId,
+        label: "equipInstanceOf",
+      });
+    }
+    // WorkUnit → equipmentInUnit → Equipment
+    if (eq.workUnitId) {
+      const wuId = `wu:${eq.workUnitId}`;
+      if (nodeIds.has(wuId)) {
+        addEdge({
+          id: `e:wu:${eq.workUnitId}:eq:${eq.id}:equipmentInUnit`,
+          source: wuId,
+          target: eqId,
+          label: "equipmentInUnit",
+        });
+      }
+    }
+  }
+
+  // ── MaintenanceTaskDefinition nodes + requiresEquipment edges ─────────
+  // Build a map from skill code → equipment class node id.
+  const skillToEqClassId = new Map<string, string>();
+  for (const ec of equipmentClasses) {
+    const ecId = `eqclass:${ec.id}`;
+    for (const skill of ec.requiredForSkills) {
+      skillToEqClassId.set(skill, ecId);
+    }
+  }
+  // Synthetic task-definition nodes — one per unique ATA code across all WP tasks.
+  const taskDefByAta = new Map<string, { ataCode: string; s1000dCode: string | null; skill: string }>();
+  for (const t of workPackageTasks) {
+    if (!taskDefByAta.has(t.ataCode)) {
+      taskDefByAta.set(t.ataCode, {
+        ataCode: t.ataCode,
+        s1000dCode: (t as { s1000dCode?: string | null }).s1000dCode ?? null,
+        skill: t.skill,
+      });
+    }
+  }
+  for (const [ataCode, def] of taskDefByAta) {
+    const tdId = `taskdef:${slug(ataCode)}`;
+    addNode({
+      id: tdId,
+      type: "MaintenanceTaskDefinition",
+      label: `${ataCode}${def.s1000dCode ? ` / ${def.s1000dCode}` : ""}`,
+      properties: {
+        ataCode,
+        s1000dCode: def.s1000dCode,
+        skill: def.skill,
+      },
+    });
+    // requiresEquipment edge to equipment class, if the skill maps to one
+    const ecNodeId = skillToEqClassId.get(def.skill);
+    if (ecNodeId && nodeIds.has(ecNodeId)) {
+      addEdge({
+        id: `e:taskdef:${slug(ataCode)}:requiresEquipment`,
+        source: tdId,
+        target: ecNodeId,
+        label: "requiresEquipment",
+      });
+    }
+    // executes edge: link each task execution to its definition
+    for (const t of workPackageTasks.filter((t) => t.ataCode === ataCode)) {
+      const tcnNodeId = `tcn:${t.tcn}`;
+      if (nodeIds.has(tcnNodeId)) {
+        addEdge({
+          id: `e:tcn:${t.tcn}:executes`,
+          source: tcnNodeId,
+          target: tdId,
+          label: "executes",
+        });
+      }
+    }
+  }
+
   // ── ISA-95 Personnel Classes ───────────────────────────────────────────
   for (const pc of personnelClasses) {
     const pcId = `personnel-class:${pc.id}`;
@@ -785,6 +957,22 @@ export function buildGraph(
           target: `tcn:${seg.sourceTcn}`,
           label: "mirrorsTcn",
         });
+      }
+
+      // OperationSegment → Equipment (segmentUsesEquipment) — equipment in the
+      // segment's assigned work unit, enabling execution-readiness checks (FR-20/26).
+      if (seg.assignedWorkUnitId) {
+        for (const eq of equipment.filter((e) => e.workUnitId === seg.assignedWorkUnitId)) {
+          const eqNodeId = `eq:${eq.id}`;
+          if (nodeIds.has(eqNodeId)) {
+            addEdge({
+              id: `e:opseg:${seg.id}:eq:${eq.id}:segmentUsesEquipment`,
+              source: segId,
+              target: eqNodeId,
+              label: "segmentUsesEquipment",
+            });
+          }
+        }
       }
     }
   }

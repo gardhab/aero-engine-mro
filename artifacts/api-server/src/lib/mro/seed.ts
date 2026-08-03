@@ -32,7 +32,7 @@ import {
   ensureTatHistorySeeded,
   ensureWorkPackagesSeeded,
 } from "./work-packages";
-import { ensureEquipmentHierarchySeeded } from "./equipment-hierarchy";
+import { ensureEquipmentHierarchySeeded, ensureWorkUnitsAndEquipmentSeeded } from "./equipment-hierarchy";
 import { logger } from "../logger";
 
 const SEED_CLASSES_FULL: OntologyClass[] = SEED_CLASSES.map((c) => ({
@@ -66,6 +66,8 @@ async function doSeed(): Promise<void> {
     await ensureTatHistorySeeded();
     // ISA-95 equipment hierarchy (work centres, personnel classes).
     await ensureEquipmentHierarchySeeded();
+    // ISA-95 equipment classes, work units, and equipment (added after initial seed).
+    await ensureWorkUnitsAndEquipmentSeeded();
     // Graph rebuild is deferred to the first /api/graph request so Kùzu's
     // blocking native operations don't stall the event loop at startup.
     return;
@@ -166,6 +168,7 @@ async function doSeed(): Promise<void> {
   await ensureWorkPackagesSeeded();
   await ensureTatHistorySeeded();
   await ensureEquipmentHierarchySeeded();
+  await ensureWorkUnitsAndEquipmentSeeded();
   // Graph rebuild deferred — see above.
   logger.info("Seeding complete");
 }
