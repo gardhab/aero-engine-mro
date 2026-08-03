@@ -329,11 +329,47 @@ export async function ensureEquipmentHierarchySeeded(): Promise<void> {
 }
 
 /**
+ * Ensure the equipment_classes and equipment tables exist in the database.
+ * On an existing deployed database that predates this feature, drizzle-kit push
+ * may not have run; calling this before any equipment query prevents
+ * "relation does not exist" errors at startup.
+ */
+async function ensureEquipmentTablesExist(): Promise<void> {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS equipment_classes (
+      id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      equipment_class_code TEXT NOT NULL UNIQUE,
+      name                TEXT NOT NULL,
+      description         TEXT,
+      required_for_skills JSONB NOT NULL DEFAULT '[]',
+      twin_state          TEXT NOT NULL DEFAULT 'ACTIVE',
+      created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS equipment (
+      id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      equipment_class_id  UUID NOT NULL REFERENCES equipment_classes(id),
+      work_unit_id        UUID REFERENCES work_units(id),
+      name                TEXT NOT NULL,
+      serial_number       TEXT,
+      equipment_status    TEXT NOT NULL DEFAULT 'AVAILABLE',
+      twin_state          TEXT NOT NULL DEFAULT 'ACTIVE',
+      created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+}
+
+/**
  * Idempotently seed equipment classes, work units, and equipment on databases
  * that existed before this feature was added. Safe to call on fresh seeds too —
  * the equipment_classes check prevents double-inserts.
  */
 export async function ensureWorkUnitsAndEquipmentSeeded(): Promise<void> {
+  await ensureEquipmentTablesExist();
+
   const [{ n }] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(equipmentClassesTable);

@@ -9,8 +9,6 @@ import {
   StructuredListCell,
   StructuredListBody,
   InlineNotification,
-  Accordion,
-  AccordionItem,
 } from '@carbon/react';
 
 interface WorkCentre {
