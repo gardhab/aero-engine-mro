@@ -27,6 +27,10 @@ import { logActivity } from "./activity";
 const HIERARCHY_SEED_MARKER = "ISA-95 equipment hierarchy seeded";
 
 export async function ensureEquipmentHierarchySeeded(): Promise<void> {
+  // Ensure every ISA-95 table exists before any query runs.
+  // Safe on all database vintages (all statements are CREATE … IF NOT EXISTS).
+  await ensureISA95TablesExist();
+
   // Persistent gate — skip if already run on this database.
   const [{ n }] = await db
     .select({ n: sql<number>`count(*)::int` })
@@ -329,38 +333,122 @@ export async function ensureEquipmentHierarchySeeded(): Promise<void> {
 }
 
 /**
- * Ensure the equipment_classes and equipment tables exist in the database.
- * On an existing deployed database that predates this feature, drizzle-kit push
- * may not have run; calling this before any equipment query prevents
- * "relation does not exist" errors at startup.
+ * Ensure the complete ISA-95 equipment hierarchy schema exists.
+ *
+ * Runs CREATE TABLE IF NOT EXISTS for every table in the ISA-95 chain in
+ * strict FK-dependency order so that the function is safe on:
+ *  (a) fresh databases — creates everything, drizzle-kit push keeps it in sync
+ *  (b) pre-ISA-95 databases — creates missing tables before seed/query runs
+ *  (c) fully-migrated databases — all statements are no-ops
+ *
+ * Tables created in order: enterprises → sites → areas → work_centers →
+ * work_units → equipment_classes → equipment
  */
-async function ensureEquipmentTablesExist(): Promise<void> {
+async function ensureISA95TablesExist(): Promise<void> {
+  // --- Tier 1: no FK deps ---
   await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS equipment_classes (
-      id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      equipment_class_code TEXT NOT NULL UNIQUE,
-      name                TEXT NOT NULL,
-      description         TEXT,
-      required_for_skills JSONB NOT NULL DEFAULT '[]',
-      twin_state          TEXT NOT NULL DEFAULT 'ACTIVE',
-      created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-      updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+    CREATE TABLE IF NOT EXISTS enterprises (
+      id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name           TEXT NOT NULL,
+      enterprise_id  TEXT NOT NULL UNIQUE,
+      twin_state     TEXT NOT NULL DEFAULT 'ACTIVE',
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
   await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS personnel_classes (
+      id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      class_code   TEXT NOT NULL UNIQUE,
+      name         TEXT NOT NULL,
+      qualifications JSONB NOT NULL DEFAULT '[]',
+      twin_state   TEXT NOT NULL DEFAULT 'ACTIVE',
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  // --- Tier 2: depends on enterprises ---
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS sites (
+      id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      enterprise_id UUID NOT NULL REFERENCES enterprises(id),
+      name          TEXT NOT NULL,
+      icao_code     TEXT,
+      twin_state    TEXT NOT NULL DEFAULT 'ACTIVE',
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  // --- Tier 3: depends on sites ---
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS areas (
+      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      site_id    UUID NOT NULL REFERENCES sites(id),
+      name       TEXT NOT NULL,
+      area_type  TEXT NOT NULL,
+      twin_state TEXT NOT NULL DEFAULT 'ACTIVE',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  // --- Tier 4: depends on areas ---
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS work_centers (
+      id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      area_id          UUID NOT NULL REFERENCES areas(id),
+      name             TEXT NOT NULL,
+      work_center_type TEXT NOT NULL,
+      capacity         INTEGER NOT NULL DEFAULT 1,
+      twin_state       TEXT NOT NULL DEFAULT 'ACTIVE',
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  // --- Tier 5: depends on work_centers ---
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS work_units (
+      id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      work_center_id UUID NOT NULL REFERENCES work_centers(id),
+      name           TEXT NOT NULL,
+      work_unit_type TEXT NOT NULL DEFAULT 'WorkCell',
+      twin_state     TEXT NOT NULL DEFAULT 'ACTIVE',
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  // --- Tier 6: depends on nothing (no FK) ---
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS equipment_classes (
+      id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      equipment_class_code TEXT NOT NULL UNIQUE,
+      name                 TEXT NOT NULL,
+      description          TEXT,
+      required_for_skills  JSONB NOT NULL DEFAULT '[]',
+      twin_state           TEXT NOT NULL DEFAULT 'ACTIVE',
+      created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  // --- Tier 7: depends on equipment_classes + work_units ---
+  await db.execute(sql`
     CREATE TABLE IF NOT EXISTS equipment (
-      id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      equipment_class_id  UUID NOT NULL REFERENCES equipment_classes(id),
-      work_unit_id        UUID REFERENCES work_units(id),
-      name                TEXT NOT NULL,
-      serial_number       TEXT,
-      equipment_status    TEXT NOT NULL DEFAULT 'AVAILABLE',
-      twin_state          TEXT NOT NULL DEFAULT 'ACTIVE',
-      created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-      updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+      id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      equipment_class_id UUID NOT NULL REFERENCES equipment_classes(id),
+      work_unit_id       UUID REFERENCES work_units(id),
+      name               TEXT NOT NULL,
+      serial_number      TEXT,
+      equipment_status   TEXT NOT NULL DEFAULT 'AVAILABLE',
+      twin_state         TEXT NOT NULL DEFAULT 'ACTIVE',
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
 }
+
+// Re-export under the old name so existing callers don't need updating.
+// The old function only created equipment_classes + equipment; the new one
+// covers the full ISA-95 table chain safely (all IF NOT EXISTS).
+const ensureEquipmentTablesExist = ensureISA95TablesExist;
 
 /**
  * Idempotently seed equipment classes, work units, and equipment on databases
