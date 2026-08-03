@@ -52,6 +52,10 @@ const NODE_STYLE: Record<string, { background: string; color: string; group: 'as
   WorkCenter: { background: '#005d5d', color: '#fff', group: 'isa95' },
   OperationSegment: { background: '#9ef0f0', color: '#161616', group: 'isa95' },
   PersonnelClass: { background: '#007d79', color: '#fff', group: 'isa95' },
+  WorkUnit: { background: '#08bdba', color: '#161616', group: 'isa95' },
+  EquipmentClass: { background: '#3ddbd9', color: '#161616', group: 'isa95' },
+  Equipment: { background: '#baf1f0', color: '#161616', group: 'isa95' },
+  MaintenanceTaskDefinition: { background: '#6929c4', color: '#fff', group: 'isa95' },
 };
 
 const LEGEND: { label: string; color: string }[] = [
@@ -64,8 +68,12 @@ const LEGEND: { label: string; color: string }[] = [
   { label: 'Compliance assessment', color: '#ffd7d9' },
   { label: 'Recommendation', color: '#24a148' },
   { label: 'Work Centre (ISA-95)', color: '#005d5d' },
+  { label: 'Work Unit / Bay (ISA-95)', color: '#08bdba' },
+  { label: 'Equipment Class (ISA-95)', color: '#3ddbd9' },
+  { label: 'Equipment Instance (ISA-95)', color: '#baf1f0' },
   { label: 'Operation Segment (ISA-95)', color: '#9ef0f0' },
   { label: 'Personnel Class (ISA-95)', color: '#007d79' },
+  { label: 'Task Definition (ISA-95)', color: '#6929c4' },
 ];
 
 // ── Grouped type-filter items ─────────────────────────────────────────────────
@@ -97,7 +105,10 @@ function buildTypeFilterItems(): TypeFilterItem[] {
     },
     {
       label: 'ISA-95',
-      types: ['WorkCenter', 'OperationSegment', 'PersonnelClass'],
+      types: [
+        'WorkCenter', 'WorkUnit', 'EquipmentClass', 'Equipment',
+        'OperationSegment', 'PersonnelClass', 'MaintenanceTaskDefinition',
+      ],
     },
   ];
   const items: TypeFilterItem[] = [
